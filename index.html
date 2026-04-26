@@ -163,6 +163,8 @@
             const [step, setStep] = useState(0);
             const [preRecordData, setPreRecordData] = useState(null);
             const [postRecordData, setPostRecordData] = useState(null);
+            const [artworkNameData, setArtworkNameData] = useState(null); // 작품명 녹음
+            const [actualArtworkData, setActualArtworkData] = useState(null); // 실제 작품 사진
             const [blueprintData, setBlueprintData] = useState(null); // 설계도 이미지
             const [stars, setStars] = useState(0);
 
@@ -305,10 +307,11 @@
                     case 1: text = "분리수거란 무엇일까요? 마이크 버튼을 누르고 아는 대로 말해주세요."; break;
                     case 2: text = "바다에 떠다니는 쓰레기들을 손가락으로 눌러서 모두 주워주세요."; break;
                     case 3: text = "주운 쓰레기를 누르고, 알맞은 분리수거함을 골라주세요."; break;
-                    case 4: text = "재활용품으로 무엇을 만들지 설계도를 그리거나, 직접 만든 작품의 사진을 찍어 올려주세요!"; break;
-                    case 5: text = ""; break;
-                    case 6: text = "새롭게 알게 된 점을 마이크 버튼을 누르고 말해주세요."; break;
-                    case 7: text = "스스로 평가해 보세요! 별을 눌러 점수를 주세요."; break;
+                    case 4: text = "놀라운 쓰레기의 변신! 예시 작품들을 구경하고, 나만의 업사이클링 작품명을 녹음해주세요!"; break;
+                    case 5: text = "재활용품으로 무엇을 만들지 설계도를 멋지게 그려보세요!"; break;
+                    case 6: text = "오늘 완성한 실제 작품 사진이 있다면 멋지게 찍어 올려주세요!"; break;
+                    case 7: text = "새롭게 알게 된 점을 마이크 버튼을 누르고 말해주세요."; break;
+                    case 8: text = "최고의 분리수거 대장! 스스로에게 별점을 주고 임명장을 저장하세요!"; break;
                 }
                 if (text) setTimeout(() => speak(text), 500);
             }, [step, speakerEnabled]);
@@ -1400,23 +1403,108 @@
                                     </motion.div>
                                 )}
 
-                                {/* STEP 4 & 5: Blueprint Sketchpad */}
+                                {/* STEP 4: Upcycling Ideation & Record Name */}
                                 {step === 4 && (
-                                    <motion.div key="step4_5" className="absolute inset-0 bg-slate-50"
+                                    <motion.div key="step4" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-blue-50 to-indigo-50"
+                                        initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.05 }}>
+                                        
+                                        <div className="bg-white p-10 rounded-[3rem] shadow-2xl w-full max-w-6xl flex flex-col items-center gap-8 border-8 border-indigo-300">
+                                            <h2 className="text-5xl font-bold text-indigo-800">놀라운 쓰레기의 변신! ♻️</h2>
+                                            <p className="text-3xl font-bold text-slate-700 bg-indigo-50 px-8 py-4 rounded-full">분리수거한 용품들로 나만의 업사이클링 작품을 만들어볼까요?</p>
+                                            
+                                            <div className="flex gap-6 w-full justify-center">
+                                                <div className="flex flex-col items-center bg-slate-50 p-4 rounded-2xl border-4 border-slate-200">
+                                                    <img src="./bottle_cap_keyring_1777192783035.png" alt="병뚜껑 키링" className="w-56 h-56 object-cover rounded-xl shadow-md mb-4" />
+                                                    <span className="text-2xl font-bold text-slate-700">병뚜껑 키링</span>
+                                                </div>
+                                                <div className="flex flex-col items-center bg-slate-50 p-4 rounded-2xl border-4 border-slate-200">
+                                                    <img src="./junk_robot_1777192796249.png" alt="폐품 로보트" className="w-56 h-56 object-cover rounded-xl shadow-md mb-4" />
+                                                    <span className="text-2xl font-bold text-slate-700">폐품 로보트</span>
+                                                </div>
+                                                <div className="flex flex-col items-center bg-slate-50 p-4 rounded-2xl border-4 border-slate-200">
+                                                    <img src="./cardboard_truck_1777192814027.png" alt="종이상자 트럭" className="w-56 h-56 object-cover rounded-xl shadow-md mb-4" />
+                                                    <span className="text-2xl font-bold text-slate-700">종이상자 트럭</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="w-full mt-4">
+                                                <RecorderComponent
+                                                    defaultText="나만의 업사이클링 작품명을 우선 지어보세요!"
+                                                    onComplete={(data) => {
+                                                        setArtworkNameData(data);
+                                                    }}
+                                                />
+                                            </div>
+
+                                            {artworkNameData && (
+                                                <motion.button
+                                                    onClick={() => setStep(5)}
+                                                    className="w-full bg-blue-500 text-white text-4xl font-bold py-6 rounded-full shadow-lg hover:bg-blue-600 active:scale-95 transition-all mt-4"
+                                                    initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                                                >
+                                                    업사이클링 설계도를 그려볼까요? 🚀
+                                                </motion.button>
+                                            )}
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {/* STEP 5: Blueprint Sketchpad */}
+                                {step === 5 && (
+                                    <motion.div key="step5" className="absolute inset-0 bg-slate-50"
                                         initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.05 }}>
                                         <BlueprintComponent 
                                             onComplete={(base64) => {
                                                 setBlueprintData(base64);
-                                                // 5단계를 생략하고 바로 6단계(사후녹음)로 넘어감
                                                 setStep(6);
                                             }} 
                                         />
                                     </motion.div>
                                 )}
 
-                                {/* STEP 6: Post-record */}
+                                {/* STEP 6: Real Photo Upload */}
                                 {step === 6 && (
-                                    <motion.div key="step6" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-green-50 to-teal-50"
+                                    <motion.div key="step6" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-teal-50 to-emerald-50"
+                                        initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.05 }}>
+                                        
+                                        <div className="bg-white p-12 rounded-[3rem] shadow-2xl max-w-4xl w-full flex flex-col items-center gap-8 border-8 border-teal-300 text-center">
+                                            <h2 className="text-5xl font-bold text-teal-800 mb-2">오늘 활동 참 잘했어요! 🎉</h2>
+                                            <p className="text-3xl font-bold text-slate-700 bg-teal-50 px-8 py-4 rounded-full mb-4">설계도를 보고 실제로 만든 작품 사진이 있다면 찍어 올려볼까요?</p>
+                                            
+                                            <div className="w-80 h-80 bg-slate-100 rounded-3xl border-8 border-dashed border-slate-300 flex items-center justify-center mb-4 overflow-hidden relative">
+                                                {actualArtworkData ? (
+                                                    <img src={actualArtworkData} alt="실제 작품" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <Icon name="Camera" size={100} className="text-slate-300" />
+                                                )}
+                                            </div>
+
+                                            <div className="flex gap-6 w-full">
+                                                <input type="file" accept="image/*" capture="environment" className="hidden" id="realPhotoUpload" 
+                                                    onChange={(e) => {
+                                                        const file = e.target.files[0];
+                                                        if (file) {
+                                                            const reader = new FileReader();
+                                                            reader.onloadend = () => setActualArtworkData(reader.result);
+                                                            reader.readAsDataURL(file);
+                                                        }
+                                                    }} 
+                                                />
+                                                <button onClick={() => document.getElementById('realPhotoUpload').click()} className="flex-1 bg-teal-500 text-white text-4xl font-bold py-6 rounded-full shadow-lg hover:bg-teal-600 active:scale-95 transition-all">
+                                                    📷 사진 올리기
+                                                </button>
+                                            </div>
+
+                                            <button onClick={() => setStep(7)} className="w-full bg-slate-200 text-slate-600 text-3xl font-bold py-4 rounded-full hover:bg-slate-300 active:scale-95 transition-all mt-4">
+                                                {actualArtworkData ? "다음으로 넘어가기 →" : "사진 없이 넘어가기 →"}
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {/* STEP 7: Post-record */}
+                                {step === 7 && (
+                                    <motion.div key="step7" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-green-50 to-teal-50"
                                         initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }}>
                                         <div className="bg-white px-10 py-5 rounded-full shadow-sm border-4 border-teal-200 mb-8 text-center">
                                             <p className="text-4xl font-bold text-teal-700">🎤 마이크 버튼을 누르고 새롭게 알게 된 점을 말해봐요!</p>
@@ -1425,15 +1513,15 @@
                                             defaultText="오늘 활동을 통해 새롭게 알게 된 점은 무엇인가요?"
                                             onComplete={(data) => {
                                                 setPostRecordData(data);
-                                                handleNextStep();
+                                                setStep(8);
                                             }}
                                         />
                                     </motion.div>
                                 )}
 
-                                {/* STEP 7: Evaluation & Submit - Certificate Layout */}
-                                {step === 7 && (
-                                    <motion.div key="step7" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-yellow-50 to-amber-100"
+                                {/* STEP 8: Evaluation & Submit - Certificate Layout */}
+                                {step === 8 && (
+                                    <motion.div key="step8" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-yellow-50 to-amber-100"
                                         initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
                                         
                                         <div className="bg-white p-10 rounded-[3rem] shadow-2xl w-[90%] max-w-[1600px] h-[90%] flex flex-col border-[16px] border-double border-yellow-500 relative">
@@ -1441,34 +1529,46 @@
                                             {/* Certificate Header */}
                                             <div className="text-center mb-8">
                                                 <h2 className="text-[5rem] font-black text-yellow-800 mb-4 tracking-widest drop-shadow-sm">🏆 분리수거 대장 임명장 🏆</h2>
-                                                <p className="text-4xl font-bold text-slate-700">이름: <span className="text-blue-700 underline decoration-wavy decoration-blue-300">{studentName}</span> 대장</p>
+                                                <p className="text-4xl font-bold text-slate-700">
+                                                    이름: <span className="text-blue-700 underline decoration-wavy decoration-blue-300">{studentName}</span> 대장
+                                                    {artworkNameData && <span className="ml-8 text-slate-400">| 작품명: <span className="text-green-700 font-black">{artworkNameData.text}</span></span>}
+                                                </p>
                                             </div>
 
                                             {/* Content Area - Split Layout */}
                                             <div className="flex flex-1 gap-8 overflow-hidden mb-8">
                                                 
-                                                {/* Left: Blueprint */}
-                                                <div className="flex-1 bg-slate-50 border-4 border-slate-200 rounded-3xl p-6 flex flex-col shadow-inner">
-                                                    <h3 className="text-4xl font-bold text-slate-800 mb-4 text-center">🎨 나의 업사이클링 설계도</h3>
-                                                    <div className="flex-1 relative bg-white rounded-2xl overflow-hidden border-4 border-slate-300 flex items-center justify-center">
-                                                        {blueprintData ? (
-                                                            <img src={blueprintData} alt="설계도" className="max-w-full max-h-full object-contain" />
-                                                        ) : (
-                                                            <span className="text-4xl font-bold text-slate-400">저장된 설계도가 없습니다.</span>
+                                                {/* Left: Blueprint & Real Photo */}
+                                                <div className="flex-[0.8] bg-slate-50 border-4 border-slate-200 rounded-3xl p-6 flex flex-col shadow-inner gap-4">
+                                                    <h3 className="text-4xl font-bold text-slate-800 mb-2 text-center">🎨 나의 작품</h3>
+                                                    <div className="flex-1 flex flex-col gap-4 overflow-hidden">
+                                                        <div className="flex-1 relative bg-white rounded-2xl overflow-hidden border-4 border-slate-300 flex items-center justify-center p-2">
+                                                            {blueprintData ? (
+                                                                <img src={blueprintData} alt="설계도" className="w-full h-full object-contain" />
+                                                            ) : (
+                                                                <span className="text-3xl font-bold text-slate-400">설계도 없음</span>
+                                                            )}
+                                                            <div className="absolute top-4 left-4 bg-black/60 text-white px-4 py-2 rounded-full text-xl font-bold">📝 설계도</div>
+                                                        </div>
+                                                        {actualArtworkData && (
+                                                            <div className="flex-1 relative bg-white rounded-2xl overflow-hidden border-4 border-slate-300 flex items-center justify-center p-2">
+                                                                <img src={actualArtworkData} alt="실제 작품" className="w-full h-full object-contain" />
+                                                                <div className="absolute top-4 left-4 bg-green-600/80 text-white px-4 py-2 rounded-full text-xl font-bold">📸 실제 완성작</div>
+                                                            </div>
                                                         )}
                                                     </div>
                                                 </div>
 
                                                 {/* Right: Knowledge */}
                                                 <div className="flex-1 flex flex-col gap-6">
-                                                    <div className="bg-blue-50 border-4 border-blue-200 rounded-3xl p-8 flex-1 flex flex-col shadow-inner">
-                                                        <h3 className="text-4xl font-bold text-blue-800 mb-4">💡 내가 아는 분리수거</h3>
+                                                    <div className="bg-blue-50 border-4 border-blue-200 rounded-3xl p-8 flex-1 flex flex-col shadow-inner overflow-hidden">
+                                                        <h3 className="text-4xl font-bold text-blue-800 mb-4 shrink-0">💡 내가 아는 분리수거</h3>
                                                         <p className="text-4xl font-bold text-slate-700 leading-relaxed overflow-y-auto hide-scrollbar">
                                                             {preRecordData?.text || "녹음된 내용이 없습니다."}
                                                         </p>
                                                     </div>
-                                                    <div className="bg-emerald-50 border-4 border-emerald-200 rounded-3xl p-8 flex-1 flex flex-col shadow-inner">
-                                                        <h3 className="text-4xl font-bold text-emerald-800 mb-4">🌟 새롭게 알게 된 점</h3>
+                                                    <div className="bg-emerald-50 border-4 border-emerald-200 rounded-3xl p-8 flex-1 flex flex-col shadow-inner overflow-hidden">
+                                                        <h3 className="text-4xl font-bold text-emerald-800 mb-4 shrink-0">🌟 새롭게 알게 된 점</h3>
                                                         <p className="text-4xl font-bold text-slate-700 leading-relaxed overflow-y-auto hide-scrollbar">
                                                             {postRecordData?.text || "녹음된 내용이 없습니다."}
                                                         </p>
