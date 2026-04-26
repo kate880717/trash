@@ -17,6 +17,8 @@
     <script src="https://unpkg.com/framer-motion@10.16.4/dist/framer-motion.js"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- html2canvas -->
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Jua&family=Nunito:wght@700;900&display=swap');
@@ -168,10 +170,22 @@
             const [blueprintData, setBlueprintData] = useState(null); // 설계도 이미지
             const [stars, setStars] = useState(0);
 
+            // 매칭 게임 상태
+            const MATCHING_PAIRS = [
+                { id: 'bottle', trashIcon: '🥤', trashName: '플라스틱병', upcycleIcon: '👜', upcycleName: '에코백', message: '페트병 15개를 모으면\n멋진 에코백 한 개를 만들 수 있어요!' },
+                { id: 'can', trashIcon: '🥫', trashName: '캔/고철', upcycleIcon: '🚲', upcycleName: '자전거 프레임', message: '캔을 분리수거하면\n튼튼한 자전거 프레임으로 다시 태어나요!' },
+                { id: 'carton', trashIcon: '📦', trashName: '종이/우유팩', upcycleIcon: '🧻', upcycleName: '두루마리 휴지', message: '종이팩을 깨끗이 씻어 모으면\n최고급 두루마리 휴지가 된답니다!' }
+            ];
+            const [selectedMatchingTrash, setSelectedMatchingTrash] = useState(null);
+            const [matchedPairs, setMatchedPairs] = useState([]);
+            const [matchingPopup, setMatchingPopup] = useState(null);
+            const [matchingWrongPopup, setMatchingWrongPopup] = useState(false);
+
             // 미니게임 상태
             const [collectedTrash, setCollectedTrash] = useState([]);
             const [seaTrash, setSeaTrash] = useState([]);
             const [popupTrash, setPopupTrash] = useState(null);
+            const [feedbackPopup, setFeedbackPopup] = useState(null);
             const [selectedTrashForSort, setSelectedTrashForSort] = useState(null);
             const [sortedTrash, setSortedTrash] = useState([]);
             const [canvasObjects, setCanvasObjects] = useState([]);
@@ -234,7 +248,7 @@
                                     type: p.type,
                                     name: newName,
                                     icon: newIcon,
-                                    fact: p.fact || '분리수거를 잘 합시다!'
+                                    fact: (p.fact || '분리수거를 잘 합시다!').replace(/\\n/g, '\n')
                                 };
                             }).filter(p => p.type && p.name);
                             setProblems(parsed);
@@ -246,10 +260,10 @@
                         alert("데이터를 불러오지 못했습니다. 로컬 테스트 모드로 전환합니다.");
                         setStudents(["김철수", "이영희", "박지민"]);
                         setProblems([
-                            { type: '플라스틱류', name: '플라스틱 컵', icon: '🥤', fact: '플라스틱 컵은 내용물을 비우고 버려요!' },
-                            { type: '종이류', name: '종이상자', icon: '📦', fact: '종이상자는 테이프를 떼고 납작하게 접어서 버려요!' },
-                            { type: '유리류', name: '유리병', icon: '🫙', fact: '유리병은 깨지지 않게 조심해서 버려요.' },
-                            { type: '캔류', name: '통조림 캔', icon: '🥫', fact: '통조림 캔은 다 먹고 안을 깨끗이 씻어서 버려요.' }
+                            { type: '플라스틱류', name: '플라스틱 컵', icon: '🥤', fact: '플라스틱 컵은\n내용물을 비우고 버려요!' },
+                            { type: '종이류', name: '종이상자', icon: '📦', fact: '종이상자는 테이프를 떼고\n납작하게 접어서 버려요!' },
+                            { type: '유리류', name: '유리병', icon: '🫙', fact: '유리병은 깨지지 않게\n조심해서 버려요.' },
+                            { type: '캔류', name: '통조림 캔', icon: '🥫', fact: '통조림 캔은 다 먹고\n안을 깨끗이 씻어서 버려요.' }
                         ]);
                         setIsLoading(false);
                     });
@@ -307,11 +321,12 @@
                     case 1: text = "분리수거란 무엇일까요? 마이크 버튼을 누르고 아는 대로 말해주세요."; break;
                     case 2: text = "바다에 떠다니는 쓰레기들을 손가락으로 눌러서 모두 주워주세요."; break;
                     case 3: text = "주운 쓰레기를 누르고, 알맞은 분리수거함을 골라주세요."; break;
-                    case 4: text = "놀라운 쓰레기의 변신! 예시 작품들을 구경하고, 나만의 업사이클링 작품명을 녹음해주세요!"; break;
-                    case 5: text = "재활용품으로 무엇을 만들지 설계도를 멋지게 그려보세요!"; break;
-                    case 6: text = "오늘 완성한 실제 작품 사진이 있다면 멋지게 찍어 올려주세요!"; break;
-                    case 7: text = "새롭게 알게 된 점을 마이크 버튼을 누르고 말해주세요."; break;
-                    case 8: text = "최고의 분리수거 대장! 스스로에게 별점을 주고 임명장을 저장하세요!"; break;
+                    case 4: text = "쓰레기의 놀라운 변신! 분리수거된 쓰레기가 어떤 물건으로 변하는지 짝을 맞춰보세요."; break;
+                    case 5: text = "예시 작품들을 구경하고, 나만의 업사이클링 작품명을 녹음해주세요!"; break;
+                    case 6: text = "재활용품으로 무엇을 만들지 설계도를 멋지게 그려보세요!"; break;
+                    case 7: text = "오늘 완성한 실제 작품 사진이 있다면 멋지게 찍어 올려주세요!"; break;
+                    case 8: text = "새롭게 알게 된 점을 마이크 버튼을 누르고 말해주세요."; break;
+                    case 9: text = "최고의 분리수거 대장! 스스로에게 별점을 주고 임명장을 저장하세요!"; break;
                 }
                 if (text) setTimeout(() => speak(text), 500);
             }, [step, speakerEnabled]);
@@ -352,16 +367,47 @@
                 setPopupTrash(null);
             };
 
+            const getPostPosition = (word) => {
+                if (!word) return '은(는)';
+                const lastChar = word.charCodeAt(word.length - 1);
+                if (lastChar < 0xAC00 || lastChar > 0xD7A3) return '은(는)'; // 한글이 아니면 기본값
+                const hasJongseong = (lastChar - 0xAC00) % 28 > 0;
+                return hasJongseong ? '은' : '는';
+            };
+
             const handleSort = (trash, targetBinId) => {
+                const josa = getPostPosition(trash.name);
+                
                 if (trash.type === targetBinId) {
                     playEffect('correct');
-                    speak(`맞아요! ${trash.name}은 ${BIN_TYPES.find(b => b.id === targetBinId).name}에 버려야 해요.`);
-                    setCollectedTrash(prev => prev.filter(t => t.uid !== trash.uid));
-                    setSortedTrash(prev => [...prev, trash]);
-                    setSelectedTrashForSort(null);
+                    const binName = BIN_TYPES.find(b => b.id === targetBinId).name;
+                    speak(`맞아요! ${trash.name}${josa} ${binName}에 버려야 해요.`);
+                    setFeedbackPopup({ isCorrect: true, message: `딩동댕!\n${trash.name}${josa} ${binName}에 쏙!` });
+                    setTimeout(() => {
+                        setFeedbackPopup(null);
+                        setCollectedTrash(prev => prev.filter(t => t.uid !== trash.uid));
+                        setSortedTrash(prev => [...prev, trash]);
+                        setSelectedTrashForSort(null);
+                    }, 2000);
                 } else {
                     playEffect('wrong');
                     speak(`아니에요. 다시 생각해보세요!`);
+                    setFeedbackPopup({ isCorrect: false, message: `이런!\n${trash.name}${josa} 그곳이 아니에요.\n다시 한 번 생각해볼까요? 🤔` });
+                    setSelectedTrashForSort(null);
+                    setTimeout(() => setFeedbackPopup(null), 2500);
+                }
+            };
+
+            const downloadCertificate = () => {
+                const element = document.getElementById("certificate-area");
+                if (element && window.html2canvas) {
+                    window.html2canvas(element, { scale: 2 }).then(canvas => {
+                        const link = document.createElement("a");
+                        link.download = `${studentName}_분리수거대장_임명장.png`;
+                        link.href = canvas.toDataURL("image/png");
+                        link.click();
+                        alert("임명장이 사진으로 저장되었습니다!");
+                    });
                 }
             };
 
@@ -369,12 +415,15 @@
                 setIsSaving(true);
                 const data = {
                     studentName,
+                    artworkNameText: artworkNameData ? artworkNameData.text : "",
                     preRecordText: preRecordData.text,
                     preRecordUrl: "",
                     postRecordText: postRecordData.text,
                     postRecordUrl: "",
                     blueprintImageUrl: "",
                     blueprintDriveUrl: "",
+                    actualImageUrl: "",
+                    actualDriveUrl: "",
                     stars
                 };
 
@@ -407,6 +456,15 @@
                             }).then(res => res.json()).then(resData => ({ type: 'blueprint', driveUrl: resData.driveUrl, imageUrl: resData.imageUrl }))
                         );
                     }
+                    if (actualArtworkData) {
+                        uploadPromises.push(
+                            fetch(GAS_URL, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                                body: JSON.stringify({ action: 'uploadImage', base64Data: actualArtworkData, filename: `${studentName}_실제작품.png` })
+                            }).then(res => res.json()).then(resData => ({ type: 'actual', driveUrl: resData.driveUrl, imageUrl: resData.imageUrl }))
+                        );
+                    }
 
                     Promise.all(uploadPromises).then(results => {
                         results.forEach(r => {
@@ -415,6 +473,10 @@
                             if (r.type === 'blueprint') {
                                 data.blueprintDriveUrl = r.driveUrl;
                                 data.blueprintImageUrl = r.imageUrl;
+                            }
+                            if (r.type === 'actual') {
+                                data.actualDriveUrl = r.driveUrl;
+                                data.actualImageUrl = r.imageUrl;
                             }
                         });
                         return fetch(GAS_URL, {
@@ -1026,11 +1088,11 @@
                                     {/* 2단계 */}
                                     {shapeTipStep === 2 && (
                                         <div className="p-10 flex flex-col gap-7">
-                                            <div className="text-[5rem] text-center">🖱️</div>
+                                            <div className="text-[5rem] text-center">↖️</div>
                                             <h3 className="text-5xl font-bold text-center text-blue-700">크기 조정 · 회전</h3>
                                             <div className="bg-blue-50 border-4 border-blue-200 rounded-2xl p-7 flex flex-col gap-4">
                                                 <p className="text-4xl font-bold text-slate-800 leading-relaxed text-center">
-                                                    2️⃣&nbsp; 도형을 찍으면 바로 <span className="inline-flex items-center gap-1 bg-blue-200 px-3 py-1 rounded-xl">🖱️ 선택</span> 모드가 되어<br/>
+                                                    2️⃣&nbsp; 도형을 찍으면 바로 <span className="inline-flex items-center gap-1 bg-blue-200 px-3 py-1 rounded-xl">↖️ 선택</span> 모드가 되어<br/>
                                                     크기와 회전을 조절할 수 있어요!
                                                 </p>
                                                 <div className="flex flex-col gap-3 mt-2">
@@ -1088,7 +1150,12 @@
 
                             <div className="grid grid-cols-3 gap-2">
                                 {COLORS.map(c => (
-                                    <button key={c} onClick={() => setColor(c)}
+                                    <button key={c} onClick={() => {
+                                        setColor(c);
+                                        if (selectedId) {
+                                            setShapes(prev => prev.map(s => s.id === selectedId ? { ...s, color: c } : s));
+                                        }
+                                    }}
                                         className={`h-12 rounded-xl border-4 transition-transform ${color===c ? 'border-blue-500 scale-110 shadow' : 'border-gray-200'}`}
                                         style={{ backgroundColor: c }} />
                                 ))}
@@ -1297,8 +1364,8 @@
                                                         <div className="text-[10rem] bg-blue-50 w-64 h-64 rounded-full flex items-center justify-center border-8 border-blue-200">
                                                             {popupTrash.icon}
                                                         </div>
-                                                        <h3 className="text-5xl font-bold text-blue-900">{popupTrash.name}</h3>
-                                                        <p className="text-3xl font-bold text-gray-700 leading-relaxed bg-gray-50 p-10 rounded-3xl w-full">
+                                                        <h3 className="text-5xl font-bold text-blue-900 mb-2">{popupTrash.name}</h3>
+                                                        <p className="text-4xl font-bold text-gray-700 leading-relaxed bg-gray-50 p-10 rounded-3xl w-full text-center whitespace-pre-line break-keep">
                                                             {popupTrash.fact}
                                                         </p>
                                                         <button
@@ -1400,86 +1467,257 @@
                                                 마법 센터로 가기!
                                             </motion.button>
                                         )}
+
+                                        {/* Sorting Feedback Popup */}
+                                        <AnimatePresence>
+                                            {feedbackPopup && (
+                                                <motion.div className="absolute inset-0 bg-black/50 z-[60] flex items-center justify-center rounded-[3rem] p-8" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                                                    <motion.div className="bg-white px-16 py-12 rounded-[3rem] shadow-2xl flex flex-col items-center gap-6 border-8 border-yellow-400 max-w-4xl" initial={{ scale: 0.5, y: 50 }} animate={{ scale: 1, y: 0 }}>
+                                                        <span className="text-[10rem] leading-none mb-4">{feedbackPopup.isCorrect ? '🌟' : '😅'}</span>
+                                                        <h3 className={`text-6xl font-black ${feedbackPopup.isCorrect ? 'text-green-600' : 'text-red-500'}`}>
+                                                            {feedbackPopup.isCorrect ? '참 잘했어요!' : '아쉽네요!'}
+                                                        </h3>
+                                                        <p className="text-5xl font-bold text-slate-700 whitespace-pre-line text-center leading-[1.5] break-keep">{feedbackPopup.message}</p>
+                                                    </motion.div>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
                                     </motion.div>
                                 )}
 
-                                {/* STEP 4: Upcycling Ideation & Record Name */}
+                                {/* STEP 4: Matching Game */}
                                 {step === 4 && (
-                                    <motion.div key="step4" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-blue-50 to-indigo-50"
+                                    <motion.div key="step4" className="absolute inset-0 flex flex-col items-center justify-center p-10 bg-gradient-to-b from-indigo-50 to-purple-50"
                                         initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.05 }}>
                                         
-                                        <div className="bg-white p-10 rounded-[3rem] shadow-2xl w-full max-w-6xl flex flex-col items-center gap-8 border-8 border-indigo-300">
-                                            <h2 className="text-5xl font-bold text-indigo-800">놀라운 쓰레기의 변신! ♻️</h2>
-                                            <p className="text-3xl font-bold text-slate-700 bg-indigo-50 px-8 py-4 rounded-full">분리수거한 용품들로 나만의 업사이클링 작품을 만들어볼까요?</p>
+                                        <div className="bg-white p-10 rounded-[3rem] shadow-2xl w-full max-w-[1500px] h-full max-h-[950px] flex flex-col border-8 border-purple-300 relative">
                                             
-                                            <div className="flex gap-6 w-full justify-center">
-                                                <div className="flex flex-col items-center bg-slate-50 p-4 rounded-2xl border-4 border-slate-200">
-                                                    <img src="./bottle_cap_keyring_1777192783035.png" alt="병뚜껑 키링" className="w-56 h-56 object-cover rounded-xl shadow-md mb-4" />
-                                                    <span className="text-2xl font-bold text-slate-700">병뚜껑 키링</span>
+                                            {/* Header */}
+                                            <div className="text-center mb-8 shrink-0">
+                                                <h2 className="text-6xl font-black text-purple-800 mb-4">쓰레기의 놀라운 변신! ♻️</h2>
+                                                <p className="text-4xl font-bold text-slate-700 bg-purple-50 px-8 py-4 rounded-full inline-block">분리수거된 쓰레기가 어떤 물건으로 변하는지 짝을 맞춰보세요!</p>
+                                            </div>
+
+                                            {/* Matching Area */}
+                                            <div className="flex flex-1 gap-16 justify-between items-center w-full px-16 relative min-h-0">
+                                                
+                                                {/* Trash Column */}
+                                                <div className="flex flex-col gap-8 flex-1 h-full justify-center">
+                                                    {MATCHING_PAIRS.map(pair => (
+                                                        <motion.button
+                                                            key={`trash-${pair.id}`}
+                                                            onClick={() => {
+                                                                if (matchedPairs.includes(pair.id)) return;
+                                                                setSelectedMatchingTrash(selectedMatchingTrash === pair.id ? null : pair.id);
+                                                            }}
+                                                            className={`p-6 rounded-3xl border-8 flex flex-col items-center justify-center transition-all bg-white relative ${matchedPairs.includes(pair.id) ? 'border-gray-200 opacity-50 cursor-not-allowed' : selectedMatchingTrash === pair.id ? 'border-purple-500 shadow-[0_0_20px_rgba(168,85,247,0.5)] scale-110 z-10' : 'border-blue-200 hover:border-blue-400 hover:bg-blue-50'}`}
+                                                            whileHover={!matchedPairs.includes(pair.id) ? { scale: 1.05 } : {}}
+                                                            whileTap={!matchedPairs.includes(pair.id) ? { scale: 0.95 } : {}}
+                                                        >
+                                                            <span className="text-[6rem] leading-none mb-2">{pair.trashIcon}</span>
+                                                            <span className="text-3xl font-bold text-slate-700">{pair.trashName}</span>
+                                                            {matchedPairs.includes(pair.id) && (
+                                                                <div className="absolute inset-0 bg-white/50 rounded-2xl flex items-center justify-center">
+                                                                    <Icon name="Check" size={80} className="text-green-500" />
+                                                                </div>
+                                                            )}
+                                                        </motion.button>
+                                                    ))}
                                                 </div>
-                                                <div className="flex flex-col items-center bg-slate-50 p-4 rounded-2xl border-4 border-slate-200">
-                                                    <img src="./junk_robot_1777192796249.png" alt="폐품 로보트" className="w-56 h-56 object-cover rounded-xl shadow-md mb-4" />
-                                                    <span className="text-2xl font-bold text-slate-700">폐품 로보트</span>
+
+                                                {/* Connection Area */}
+                                                <div className="flex-[0.5] h-full flex flex-col justify-center items-center opacity-30 pointer-events-none">
+                                                    <Icon name="ArrowRight" size={100} className="text-purple-300" />
                                                 </div>
-                                                <div className="flex flex-col items-center bg-slate-50 p-4 rounded-2xl border-4 border-slate-200">
-                                                    <img src="./cardboard_truck_1777192814027.png" alt="종이상자 트럭" className="w-56 h-56 object-cover rounded-xl shadow-md mb-4" />
-                                                    <span className="text-2xl font-bold text-slate-700">종이상자 트럭</span>
+
+                                                {/* Upcycle Column (Shuffled visually) */}
+                                                <div className="flex flex-col gap-8 flex-1 h-full justify-center">
+                                                    {[MATCHING_PAIRS[1], MATCHING_PAIRS[2], MATCHING_PAIRS[0]].map(pair => (
+                                                        <motion.button
+                                                            key={`upcycle-${pair.id}`}
+                                                            onClick={() => {
+                                                                if (matchedPairs.includes(pair.id)) return;
+                                                                if (selectedMatchingTrash) {
+                                                                    if (selectedMatchingTrash === pair.id) {
+                                                                        playEffect('correct');
+                                                                        setMatchedPairs(prev => [...prev, pair.id]);
+                                                                        setSelectedMatchingTrash(null);
+                                                                        setMatchingPopup(pair);
+                                                                    } else {
+                                                                        playEffect('wrong');
+                                                                        setSelectedMatchingTrash(null);
+                                                                        setMatchingWrongPopup(true);
+                                                                        setTimeout(() => setMatchingWrongPopup(false), 2000);
+                                                                    }
+                                                                }
+                                                            }}
+                                                            className={`p-6 rounded-3xl border-8 flex flex-col items-center justify-center transition-all bg-white relative ${matchedPairs.includes(pair.id) ? 'border-gray-200 opacity-50 cursor-not-allowed' : selectedMatchingTrash ? 'border-emerald-200 hover:border-emerald-400 hover:bg-emerald-50 shadow-[0_0_15px_rgba(52,211,153,0.3)] animate-pulse' : 'border-slate-200 hover:bg-slate-50'}`}
+                                                            whileHover={!matchedPairs.includes(pair.id) ? { scale: 1.05 } : {}}
+                                                            whileTap={!matchedPairs.includes(pair.id) ? { scale: 0.95 } : {}}
+                                                        >
+                                                            <span className="text-[6rem] leading-none mb-2">{pair.upcycleIcon}</span>
+                                                            <span className="text-3xl font-bold text-slate-700">{pair.upcycleName}</span>
+                                                            {matchedPairs.includes(pair.id) && (
+                                                                <div className="absolute inset-0 bg-white/50 rounded-2xl flex items-center justify-center">
+                                                                    <Icon name="Check" size={80} className="text-green-500" />
+                                                                </div>
+                                                            )}
+                                                        </motion.button>
+                                                    ))}
                                                 </div>
                                             </div>
 
-                                            <div className="w-full mt-4">
-                                                <RecorderComponent
-                                                    defaultText="나만의 업사이클링 작품명을 우선 지어보세요!"
-                                                    onComplete={(data) => {
-                                                        setArtworkNameData(data);
-                                                    }}
-                                                />
-                                            </div>
+                                            {/* Educational Popup */}
+                                            <AnimatePresence>
+                                                {matchingPopup && (
+                                                    <motion.div 
+                                                        className="absolute inset-0 bg-black/60 z-50 flex items-center justify-center rounded-[2.5rem]"
+                                                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                                                    >
+                                                        <motion.div 
+                                                            className="bg-white p-12 rounded-[3rem] max-w-4xl flex flex-col items-center gap-8 border-8 border-yellow-400 text-center shadow-2xl"
+                                                            initial={{ scale: 0.5, y: 50 }} animate={{ scale: 1, y: 0 }}
+                                                        >
+                                                            <div className="flex items-center gap-8 text-[7rem] bg-yellow-50 px-12 py-6 rounded-[3rem] mb-4">
+                                                                <span>{matchingPopup.trashIcon}</span>
+                                                                <Icon name="ArrowRight" size={80} className="text-yellow-500" />
+                                                                <span>{matchingPopup.upcycleIcon}</span>
+                                                            </div>
+                                                            <h3 className="text-6xl font-black text-slate-800 leading-tight mb-2">우와! 정답이에요! 🎉</h3>
+                                                            <p className="text-5xl font-bold text-blue-700 bg-blue-50 px-12 py-8 rounded-[2rem] whitespace-pre-line leading-[1.5] text-center w-full">{matchingPopup.message}</p>
+                                                            <button 
+                                                                onClick={() => setMatchingPopup(null)}
+                                                                className="bg-yellow-500 text-white text-4xl font-bold px-20 py-6 rounded-full hover:bg-yellow-600 active:scale-95 transition-all mt-6"
+                                                            >
+                                                                계속하기
+                                                            </button>
+                                                        </motion.div>
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
 
-                                            {artworkNameData && (
+                                            {/* Wrong Feedback Popup */}
+                                            <AnimatePresence>
+                                                {matchingWrongPopup && (
+                                                    <motion.div 
+                                                        className="absolute inset-0 bg-black/60 z-[60] flex items-center justify-center rounded-[2.5rem]"
+                                                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                                                    >
+                                                        <motion.div 
+                                                            className="bg-white p-12 rounded-[3rem] max-w-4xl flex flex-col items-center gap-8 border-8 border-red-400 text-center shadow-2xl"
+                                                            initial={{ scale: 0.5, y: 50 }} animate={{ scale: 1, y: 0 }}
+                                                        >
+                                                            <div className="text-[10rem] leading-none mb-4 animate-bounce">🤔</div>
+                                                            <h3 className="text-6xl font-black text-red-500 leading-tight mb-2">아쉽네요! 짝이 아니에요.</h3>
+                                                            <p className="text-5xl font-bold text-slate-700 bg-slate-50 px-12 py-8 rounded-[2rem] text-center w-full">어떤 물건으로 변신할지 다시 생각해보세요!</p>
+                                                        </motion.div>
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
+
+                                            {/* Next Button (Appears when all matched) */}
+                                            {matchedPairs.length === MATCHING_PAIRS.length && !matchingPopup && (
                                                 <motion.button
-                                                    onClick={() => setStep(5)}
-                                                    className="w-full bg-blue-500 text-white text-4xl font-bold py-6 rounded-full shadow-lg hover:bg-blue-600 active:scale-95 transition-all mt-4"
-                                                    initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                                                    onClick={handleNextStep}
+                                                    className="absolute bottom-12 left-1/2 -translate-x-1/2 bg-purple-600 text-white text-5xl font-bold px-20 py-8 rounded-full shadow-2xl border-8 border-white hover:bg-purple-700 active:scale-95 transition-all animate-bounce z-40 whitespace-nowrap"
+                                                    initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }}
                                                 >
-                                                    업사이클링 설계도를 그려볼까요? 🚀
+                                                    나도 만들어볼래요! 🚀
                                                 </motion.button>
                                             )}
                                         </div>
                                     </motion.div>
                                 )}
 
-                                {/* STEP 5: Blueprint Sketchpad */}
+                                {/* STEP 5: Upcycling Ideation & Record Name */}
                                 {step === 5 && (
-                                    <motion.div key="step5" className="absolute inset-0 bg-slate-50"
+                                    <motion.div key="step5" className="absolute inset-0 flex flex-col items-center justify-center p-10 bg-gradient-to-b from-blue-50 to-indigo-50"
+                                        initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.05 }}>
+                                        
+                                        <div className="bg-white p-8 rounded-[3rem] shadow-2xl w-full max-w-[1700px] h-full max-h-[1000px] flex flex-col border-8 border-indigo-300">
+                                            
+                                            {/* Header */}
+                                            <div className="text-center mb-6 shrink-0">
+                                                <h2 className="text-6xl font-black text-indigo-800 mb-4">멋진 아이디어 구상하기! 💡</h2>
+                                                <p className="text-4xl font-bold text-slate-700 bg-indigo-50 px-8 py-3 rounded-full inline-block">분리수거한 용품들로 나만의 업사이클링 작품을 만들어볼까요?</p>
+                                            </div>
+                                            
+                                            {/* Content: Split Layout */}
+                                            <div className="flex flex-1 gap-8 overflow-hidden min-h-0">
+                                                
+                                                {/* Left: Examples */}
+                                                <div className="flex-[0.8] bg-slate-50 border-4 border-slate-200 rounded-3xl p-6 flex flex-col justify-center gap-6 shadow-inner">
+                                                    <h3 className="text-4xl font-bold text-slate-800 text-center mb-2">✨ 예시 작품</h3>
+                                                    <div className="flex flex-col gap-4 items-center overflow-y-auto hide-scrollbar">
+                                                        <div className="flex w-[80%] items-center bg-white p-4 rounded-2xl border-4 border-slate-200 shadow-sm gap-6">
+                                                            <img src="./bottle_cap_keyring_1777192783035.png" alt="병뚜껑 키링" className="w-32 h-32 object-cover rounded-xl" />
+                                                            <span className="text-3xl font-bold text-slate-700">병뚜껑 키링</span>
+                                                        </div>
+                                                        <div className="flex w-[80%] items-center bg-white p-4 rounded-2xl border-4 border-slate-200 shadow-sm gap-6">
+                                                            <img src="./junk_robot_1777192796249.png" alt="폐품 로보트" className="w-32 h-32 object-cover rounded-xl" />
+                                                            <span className="text-3xl font-bold text-slate-700">폐품 로보트</span>
+                                                        </div>
+                                                        <div className="flex w-[80%] items-center bg-white p-4 rounded-2xl border-4 border-slate-200 shadow-sm gap-6">
+                                                            <img src="./cardboard_truck_1777192814027.png" alt="종이상자 트럭" className="w-32 h-32 object-cover rounded-xl" />
+                                                            <span className="text-3xl font-bold text-slate-700">종이상자 트럭</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Right: Recorder */}
+                                                <div className="flex-1 flex flex-col justify-center items-center bg-blue-50 border-4 border-blue-200 rounded-3xl p-8 shadow-inner overflow-hidden">
+                                                    <div className="w-full max-w-4xl scale-95 origin-center">
+                                                        <RecorderComponent
+                                                            defaultText="나만의 작품명을 우선 지어보세요!"
+                                                            onComplete={(data) => {
+                                                                setArtworkNameData(data);
+                                                                handleNextStep();
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {/* STEP 6: Blueprint Sketchpad */}
+                                {step === 6 && (
+                                    <motion.div key="step6" className="absolute inset-0 bg-slate-50"
                                         initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.05 }}>
                                         <BlueprintComponent 
                                             onComplete={(base64) => {
                                                 setBlueprintData(base64);
-                                                setStep(6);
+                                                handleNextStep();
                                             }} 
                                         />
                                     </motion.div>
                                 )}
 
-                                {/* STEP 6: Real Photo Upload */}
-                                {step === 6 && (
-                                    <motion.div key="step6" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-teal-50 to-emerald-50"
+                                {/* STEP 7: Real Photo Upload */}
+                                {step === 7 && (
+                                    <motion.div key="step7" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-teal-50 to-emerald-50"
                                         initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.05 }}>
                                         
-                                        <div className="bg-white p-12 rounded-[3rem] shadow-2xl max-w-4xl w-full flex flex-col items-center gap-8 border-8 border-teal-300 text-center">
-                                            <h2 className="text-5xl font-bold text-teal-800 mb-2">오늘 활동 참 잘했어요! 🎉</h2>
-                                            <p className="text-3xl font-bold text-slate-700 bg-teal-50 px-8 py-4 rounded-full mb-4">설계도를 보고 실제로 만든 작품 사진이 있다면 찍어 올려볼까요?</p>
+                                        <div className="bg-white p-12 rounded-[3rem] shadow-2xl w-full max-w-5xl h-full max-h-[900px] flex flex-col items-center justify-between border-8 border-teal-300 text-center">
                                             
-                                            <div className="w-80 h-80 bg-slate-100 rounded-3xl border-8 border-dashed border-slate-300 flex items-center justify-center mb-4 overflow-hidden relative">
-                                                {actualArtworkData ? (
-                                                    <img src={actualArtworkData} alt="실제 작품" className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <Icon name="Camera" size={100} className="text-slate-300" />
-                                                )}
+                                            <div className="shrink-0 flex flex-col items-center">
+                                                <h2 className="text-5xl font-bold text-teal-800 mb-4">오늘 활동 참 잘했어요! 🎉</h2>
+                                                <p className="text-3xl font-bold text-slate-700 bg-teal-50 px-8 py-4 rounded-full">설계도를 보고 실제로 만든 작품 사진이 있다면 찍어 올려볼까요?</p>
+                                            </div>
+                                            
+                                            <div className="flex-1 w-full flex flex-col items-center justify-center min-h-0 py-8">
+                                                <div className="w-80 h-80 bg-slate-100 rounded-3xl border-8 border-dashed border-slate-300 flex items-center justify-center overflow-hidden relative shadow-inner">
+                                                    {actualArtworkData ? (
+                                                        <img src={actualArtworkData} alt="실제 작품" className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <Icon name="Camera" size={120} className="text-slate-300" />
+                                                    )}
+                                                </div>
                                             </div>
 
-                                            <div className="flex gap-6 w-full">
+                                            <div className="shrink-0 w-full flex flex-col gap-6 px-12">
                                                 <input type="file" accept="image/*" capture="environment" className="hidden" id="realPhotoUpload" 
                                                     onChange={(e) => {
                                                         const file = e.target.files[0];
@@ -1490,21 +1728,20 @@
                                                         }
                                                     }} 
                                                 />
-                                                <button onClick={() => document.getElementById('realPhotoUpload').click()} className="flex-1 bg-teal-500 text-white text-4xl font-bold py-6 rounded-full shadow-lg hover:bg-teal-600 active:scale-95 transition-all">
-                                                    📷 사진 올리기
+                                                <button onClick={() => document.getElementById('realPhotoUpload').click()} className="w-full bg-teal-500 text-white text-4xl font-bold py-6 rounded-full shadow-lg hover:bg-teal-600 active:scale-95 transition-all">
+                                                    📷 사진 찍기 / 올리기
+                                                </button>
+                                                <button onClick={handleNextStep} className="w-full bg-slate-200 text-slate-600 text-3xl font-bold py-5 rounded-full hover:bg-slate-300 active:scale-95 transition-all">
+                                                    {actualArtworkData ? "다음으로 넘어가기 →" : "사진 없이 그냥 넘어가기 →"}
                                                 </button>
                                             </div>
-
-                                            <button onClick={() => setStep(7)} className="w-full bg-slate-200 text-slate-600 text-3xl font-bold py-4 rounded-full hover:bg-slate-300 active:scale-95 transition-all mt-4">
-                                                {actualArtworkData ? "다음으로 넘어가기 →" : "사진 없이 넘어가기 →"}
-                                            </button>
                                         </div>
                                     </motion.div>
                                 )}
 
-                                {/* STEP 7: Post-record */}
-                                {step === 7 && (
-                                    <motion.div key="step7" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-green-50 to-teal-50"
+                                {/* STEP 8: Post-record */}
+                                {step === 8 && (
+                                    <motion.div key="step8" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-green-50 to-teal-50"
                                         initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }}>
                                         <div className="bg-white px-10 py-5 rounded-full shadow-sm border-4 border-teal-200 mb-8 text-center">
                                             <p className="text-4xl font-bold text-teal-700">🎤 마이크 버튼을 누르고 새롭게 알게 된 점을 말해봐요!</p>
@@ -1513,78 +1750,82 @@
                                             defaultText="오늘 활동을 통해 새롭게 알게 된 점은 무엇인가요?"
                                             onComplete={(data) => {
                                                 setPostRecordData(data);
-                                                setStep(8);
+                                                handleNextStep();
                                             }}
                                         />
                                     </motion.div>
                                 )}
 
-                                {/* STEP 8: Evaluation & Submit - Certificate Layout */}
-                                {step === 8 && (
-                                    <motion.div key="step8" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-yellow-50 to-amber-100"
+                                {/* STEP 9: Evaluation & Submit - Certificate Layout */}
+                                {step === 9 && (
+                                    <motion.div key="step9" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-yellow-50 to-amber-100"
                                         initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
                                         
-                                        <div className="bg-white p-10 rounded-[3rem] shadow-2xl w-[90%] max-w-[1600px] h-[90%] flex flex-col border-[16px] border-double border-yellow-500 relative">
+                                        <div id="certificate-area" className="bg-white p-10 rounded-[3rem] shadow-2xl w-[90%] max-w-[1600px] h-[90%] flex flex-col border-[16px] border-double border-yellow-500 relative">
                                             
                                             {/* Certificate Header */}
-                                            <div className="text-center mb-8">
-                                                <h2 className="text-[5rem] font-black text-yellow-800 mb-4 tracking-widest drop-shadow-sm">🏆 분리수거 대장 임명장 🏆</h2>
-                                                <p className="text-4xl font-bold text-slate-700">
+                                            <div className="text-center mb-4 shrink-0">
+                                                <h2 className="text-[4.5rem] font-black text-yellow-800 mb-2 tracking-widest drop-shadow-sm">🏆 분리수거 대장 임명장 🏆</h2>
+                                                <p className="text-3xl font-bold text-slate-700">
                                                     이름: <span className="text-blue-700 underline decoration-wavy decoration-blue-300">{studentName}</span> 대장
                                                     {artworkNameData && <span className="ml-8 text-slate-400">| 작품명: <span className="text-green-700 font-black">{artworkNameData.text}</span></span>}
                                                 </p>
                                             </div>
 
                                             {/* Content Area - Split Layout */}
-                                            <div className="flex flex-1 gap-8 overflow-hidden mb-8">
+                                            <div className="flex flex-1 gap-6 overflow-hidden mb-6 min-h-0">
                                                 
                                                 {/* Left: Blueprint & Real Photo */}
-                                                <div className="flex-[0.8] bg-slate-50 border-4 border-slate-200 rounded-3xl p-6 flex flex-col shadow-inner gap-4">
-                                                    <h3 className="text-4xl font-bold text-slate-800 mb-2 text-center">🎨 나의 작품</h3>
-                                                    <div className="flex-1 flex flex-col gap-4 overflow-hidden">
-                                                        <div className="flex-1 relative bg-white rounded-2xl overflow-hidden border-4 border-slate-300 flex items-center justify-center p-2">
+                                                <div className="flex-[0.8] bg-slate-50 border-4 border-slate-200 rounded-3xl p-5 flex flex-col shadow-inner gap-4 min-h-0">
+                                                    <h3 className="text-3xl font-bold text-slate-800 mb-1 text-center shrink-0">🎨 나의 작품</h3>
+                                                    <div className="flex-1 flex flex-col gap-4 overflow-hidden min-h-0">
+                                                        <div className="flex-1 relative bg-white rounded-2xl overflow-hidden border-4 border-slate-300 flex items-center justify-center p-2 min-h-0">
                                                             {blueprintData ? (
                                                                 <img src={blueprintData} alt="설계도" className="w-full h-full object-contain" />
                                                             ) : (
-                                                                <span className="text-3xl font-bold text-slate-400">설계도 없음</span>
+                                                                <span className="text-2xl font-bold text-slate-400">설계도 없음</span>
                                                             )}
-                                                            <div className="absolute top-4 left-4 bg-black/60 text-white px-4 py-2 rounded-full text-xl font-bold">📝 설계도</div>
+                                                            <div className="absolute top-4 left-4 bg-black/60 text-white px-3 py-1 rounded-full text-lg font-bold">📝 설계도</div>
                                                         </div>
                                                         {actualArtworkData && (
-                                                            <div className="flex-1 relative bg-white rounded-2xl overflow-hidden border-4 border-slate-300 flex items-center justify-center p-2">
+                                                            <div className="flex-1 relative bg-white rounded-2xl overflow-hidden border-4 border-slate-300 flex items-center justify-center p-2 min-h-0">
                                                                 <img src={actualArtworkData} alt="실제 작품" className="w-full h-full object-contain" />
-                                                                <div className="absolute top-4 left-4 bg-green-600/80 text-white px-4 py-2 rounded-full text-xl font-bold">📸 실제 완성작</div>
+                                                                <div className="absolute top-4 left-4 bg-green-600/80 text-white px-3 py-1 rounded-full text-lg font-bold">📸 실제 완성작</div>
                                                             </div>
                                                         )}
                                                     </div>
                                                 </div>
 
                                                 {/* Right: Knowledge */}
-                                                <div className="flex-1 flex flex-col gap-6">
-                                                    <div className="bg-blue-50 border-4 border-blue-200 rounded-3xl p-8 flex-1 flex flex-col shadow-inner overflow-hidden">
-                                                        <h3 className="text-4xl font-bold text-blue-800 mb-4 shrink-0">💡 내가 아는 분리수거</h3>
-                                                        <p className="text-4xl font-bold text-slate-700 leading-relaxed overflow-y-auto hide-scrollbar">
-                                                            {preRecordData?.text || "녹음된 내용이 없습니다."}
-                                                        </p>
+                                                <div className="flex-1 flex flex-col gap-4 min-h-0">
+                                                    <div className="bg-blue-50 border-4 border-blue-200 rounded-3xl p-6 flex-1 flex flex-col shadow-inner overflow-hidden min-h-0">
+                                                        <h3 className="text-3xl font-bold text-blue-800 mb-3 shrink-0">💡 내가 아는 분리수거</h3>
+                                                        <div className="flex-1 overflow-y-auto hide-scrollbar min-h-0">
+                                                            <p className="text-2xl font-bold text-slate-700 leading-relaxed">
+                                                                {preRecordData?.text || "녹음된 내용이 없습니다."}
+                                                            </p>
+                                                        </div>
                                                     </div>
-                                                    <div className="bg-emerald-50 border-4 border-emerald-200 rounded-3xl p-8 flex-1 flex flex-col shadow-inner overflow-hidden">
-                                                        <h3 className="text-4xl font-bold text-emerald-800 mb-4 shrink-0">🌟 새롭게 알게 된 점</h3>
-                                                        <p className="text-4xl font-bold text-slate-700 leading-relaxed overflow-y-auto hide-scrollbar">
-                                                            {postRecordData?.text || "녹음된 내용이 없습니다."}
-                                                        </p>
+                                                    <div className="bg-emerald-50 border-4 border-emerald-200 rounded-3xl p-6 flex-1 flex flex-col shadow-inner overflow-hidden min-h-0">
+                                                        <h3 className="text-3xl font-bold text-emerald-800 mb-3 shrink-0">🌟 새롭게 알게 된 점</h3>
+                                                        <div className="flex-1 overflow-y-auto hide-scrollbar min-h-0">
+                                                            <p className="text-2xl font-bold text-slate-700 leading-relaxed">
+                                                                {postRecordData?.text || "녹음된 내용이 없습니다."}
+                                                            </p>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
 
                                             {/* Evaluation Area */}
-                                            <div className="bg-yellow-50 rounded-3xl p-8 flex items-center justify-between border-4 border-yellow-300 shadow-md">
+                                            <div className="bg-yellow-50 rounded-3xl p-6 flex items-center justify-between border-4 border-yellow-300 shadow-md shrink-0 h-[160px]">
                                                 <div className="flex flex-col gap-3 max-w-[30%]">
-                                                    <span className="text-4xl font-bold text-yellow-900">나의 활동 별점 주기</span>
+                                                    <span className="text-3xl font-bold text-yellow-900">나의 활동 별점 주기</span>
                                                     {stars > 0 && stars < 4 && (
-                                                        <span className="text-3xl font-bold text-orange-600 animate-bounce">다음에 다시 도전해봐요! 💪</span>
+                                                        <span className="text-2xl font-bold text-orange-600 animate-bounce">다음에 다시 도전해봐요! 💪</span>
                                                     )}
                                                     {stars >= 4 && (
-                                                        <span className="text-3xl font-bold text-green-600 animate-bounce">최고의 대장이에요! 🌟</span>
+                                                        <span className="text-2xl font-bold text-green-600 animate-bounce">최고의 대장이에요! 🌟</span>
                                                     )}
                                                 </div>
                                                 
@@ -1597,7 +1838,7 @@
                                                         >
                                                             <Icon
                                                                 name="Star"
-                                                                size={90}
+                                                                size={70}
                                                                 className={`${stars >= star ? 'text-yellow-400 fill-yellow-400 drop-shadow-xl scale-110' : 'text-gray-300 fill-gray-100'} transition-all`}
                                                             />
                                                         </button>
@@ -1608,17 +1849,24 @@
                                                     {stars > 0 && stars < 4 && (
                                                         <button
                                                             onClick={() => window.location.reload()}
-                                                            className="px-8 py-6 rounded-full text-3xl font-bold text-slate-700 bg-slate-200 hover:bg-slate-300 active:scale-95 shadow-lg"
+                                                            className="px-8 py-5 rounded-full text-2xl font-bold text-slate-700 bg-slate-200 hover:bg-slate-300 active:scale-95 shadow-lg"
                                                         >
                                                             다시하기
                                                         </button>
                                                     )}
                                                     <button
+                                                        onClick={downloadCertificate}
+                                                        disabled={stars === 0}
+                                                        className={`px-8 py-5 rounded-full text-2xl font-bold text-white shadow-xl transition-all ${stars === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600 active:scale-95'}`}
+                                                    >
+                                                        ⬇️ 임명장 사진 저장
+                                                    </button>
+                                                    <button
                                                         onClick={saveAllData}
                                                         disabled={stars === 0 || isSaving}
-                                                        className={`px-12 py-6 rounded-full text-4xl font-bold text-white shadow-xl transition-all ${stars === 0 || isSaving ? 'bg-gray-300 cursor-not-allowed' : 'bg-orange-500 hover:bg-orange-600 active:scale-95'}`}
+                                                        className={`px-8 py-5 rounded-full text-2xl font-bold text-white shadow-xl transition-all ${stars === 0 || isSaving ? 'bg-gray-300 cursor-not-allowed' : 'bg-orange-500 hover:bg-orange-600 active:scale-95'}`}
                                                     >
-                                                        {isSaving ? '저장 중...' : '임명장 저장하기'}
+                                                        {isSaving ? '제출 중...' : '📤 기록 제출하고 끝내기'}
                                                     </button>
                                                 </div>
                                             </div>
