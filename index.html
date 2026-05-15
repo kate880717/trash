@@ -203,7 +203,63 @@
             { id: '종이류', name: '종이', icon: '📦', color: 'bg-yellow-100 text-yellow-800 border-yellow-400' },
             { id: '병류', name: '유리병', icon: '🫙', color: 'bg-red-100 text-red-800 border-red-400' },
             { id: '캔류', name: '캔/고철', icon: '🥫', color: 'bg-gray-200 text-gray-800 border-gray-500' },
-            { id: '비닐류', name: '비닐', icon: '🛍️', color: 'bg-slate-200 text-slate-800 border-slate-500' }
+            { id: '비닐류', name: '비닐', icon: '🛍️', color: 'bg-slate-200 text-slate-800 border-slate-500' },
+            { id: '일반쓰레기', name: '일반쓰레기', icon: '🗑️', color: 'bg-stone-200 text-stone-800 border-stone-500' }
+        ];
+
+        // 분리수거 헷갈리는 퀴즈 (개념학습) - 정답+힌트 포함
+        const TRICKY_QUIZZES = [
+            {
+                id: 'paper-cup',
+                icon: '🥤',
+                question: '종이컵은 어떻게 분류할까요?',
+                answer: '일반쓰레기',
+                hint: '종이컵은 안쪽에 비닐(코팅)이 발라져 있어서 일반 종이와 달라요. 그래서 일반쓰레기로 버려야 해요!'
+            },
+            {
+                id: 'tissue',
+                icon: '🧻',
+                question: '사용한 휴지는 어떻게 분류할까요?',
+                answer: '일반쓰레기',
+                hint: '사용한 휴지는 물이나 음식이 묻어 있어서 재활용이 안 돼요. 일반쓰레기로 버려요!'
+            },
+            {
+                id: 'small-paper',
+                icon: '📄',
+                question: '작은 영수증이나 메모지는 어떻게 분류할까요?',
+                answer: '일반쓰레기',
+                hint: '너무 작은 종이나 영수증은 특수 코팅이 되어 있어서 재활용이 안 돼요. 일반쓰레기로 버려요!'
+            },
+            {
+                id: 'pet-bottle',
+                icon: '🥤',
+                question: '페트병은 어떻게 분류할까요?',
+                answer: '플라스틱류',
+                hint: '페트병은 라벨을 떼고, 안을 깨끗이 씻고, 뚜껑을 빼서 플라스틱류에 버려요!'
+            },
+            {
+                id: 'milk-carton',
+                icon: '🥛',
+                question: '우유팩은 어떻게 분류할까요?',
+                answer: '종이류',
+                hint: '우유팩은 깨끗이 씻어 말려서 종이류에 버려요. 일반 종이와 따로 모으면 더 좋아요!'
+            },
+            {
+                id: 'plastic-bag',
+                icon: '🛍️',
+                question: '과자봉지나 비닐봉투는 어떻게 분류할까요?',
+                answer: '비닐류',
+                hint: '비닐은 비닐류에 따로 모아 버려요. 음식물이 묻었으면 깨끗이 씻어서 버려요!'
+            }
+        ];
+
+        const QUIZ_BINS_FOR_CHOICE = [
+            { id: '플라스틱류', name: '플라스틱', icon: '🥤' },
+            { id: '종이류', name: '종이', icon: '📦' },
+            { id: '병류', name: '유리병', icon: '🫙' },
+            { id: '캔류', name: '캔', icon: '🥫' },
+            { id: '비닐류', name: '비닐', icon: '🛍️' },
+            { id: '일반쓰레기', name: '일반쓰레기', icon: '🗑️' }
         ];
 
         const GAS_URL = "https://script.google.com/macros/s/AKfycbyVERNJF2Gcw7AA15cL6FU5mdi2RG1GGrW_4-6-KXyBHy7kLuhUQd8OX4QxxIQXMaT7/exec";
@@ -255,7 +311,13 @@
             const [stars, setStars] = useState(0);
 
             // 도움 기록
-            const [helpUsedCount, setHelpUsedCount] = useState({ pre: 0, post: 0, artwork: 0 });
+            const [helpUsedCount, setHelpUsedCount] = useState({ pre: 0, post: 0, artwork: 0, quiz: 0 });
+
+            // 헷갈리는 분리수거 퀴즈
+            const [quizResults, setQuizResults] = useState([]); // [{id, correct, helpUsed}]
+
+            // 설계도 영상 자기평가
+            const [blueprintSelfStars, setBlueprintSelfStars] = useState(0);
 
             // 매칭 게임
             const MATCHING_PAIRS = [
@@ -442,16 +504,18 @@
                 if (!speakerEnabled) return;
                 let text = "";
                 switch (step) {
-                    case 0: text = "이름을 골라서 멋진 분리수거 대장이 되어볼까요?"; break;
-                    case 1: text = "분리수거가 무엇일까요? 마이크 버튼을 누르고 아는 만큼 말해주세요."; break;
+                    case 0: text = "이름을 골라서 멋진 분리수거 박사가 되어볼까요?"; break;
+                    case 1: text = "활동 전에 먼저, 지금 알고 있는 분리수거에 대해 말해주세요."; break;
                     case 2: text = "바다에 떠다니는 쓰레기들을 손가락으로 눌러서 모두 주워주세요."; break;
                     case 3: text = "주운 쓰레기를 누르고, 알맞은 분리수거함을 골라주세요."; break;
-                    case 4: text = "쓰레기의 놀라운 변신! 어떤 물건으로 변하는지 짝을 맞춰보세요."; break;
-                    case 5: text = "예시 작품을 보고, 나만의 작품 이름을 녹음해주세요!"; break;
-                    case 6: text = "재활용품으로 무엇을 만들지 설계도를 그려보세요!"; break;
-                    case 7: text = "완성한 작품 사진이 있다면 찍어 올려주세요!"; break;
-                    case 8: text = "오늘 새롭게 알게 된 점을 마이크 버튼을 누르고 말해주세요."; break;
-                    case 9: text = "최고의 분리수거 대장! 스스로에게 별점을 주고 임명장을 받아가세요!"; break;
+                    case 4: text = "헷갈리는 분리수거! 잘 모르겠으면 힌트 버튼을 눌러봐요."; break;
+                    case 5: text = "쓰레기의 놀라운 변신! 어떤 물건으로 변하는지 짝을 맞춰보세요."; break;
+                    case 6: text = "예시 작품을 보고, 나만의 작품 이름을 녹음해주세요!"; break;
+                    case 7: text = "재활용품으로 무엇을 만들지 설계도를 그려보세요!"; break;
+                    case 8: text = "내가 녹화한 영상을 다시 보고, 스스로 별점을 줘봐요!"; break;
+                    case 9: text = "완성한 작품 사진이 있다면 찍어 올려주세요!"; break;
+                    case 10: text = "활동 후, 새롭게 알게 된 점을 말해주세요. 처음과 비교해봐요!"; break;
+                    case 11: text = "최고의 분리수거 박사! 스스로에게 별점을 주고 임명장을 받아가세요!"; break;
                 }
                 if (text) setTimeout(() => speak(text), 500);
             }, [step, speakerEnabled]);
@@ -599,6 +663,8 @@
 
             const saveAllData = () => {
                 setIsSaving(true);
+                const quizCorrect = quizResults.filter(r => r.correct).length;
+                const quizHelpUsed = quizResults.filter(r => r.helpUsed).length;
                 const data = {
                     studentName,
                     artworkNameText: artworkNameData ? artworkNameData.text : "",
@@ -612,8 +678,12 @@
                     actualDriveUrl: "",
                     screenRecUrl: "",
                     stars,
+                    blueprintSelfStars,
                     stickers: collectedStickers.length,
-                    helpUsed: helpUsedCount.pre + helpUsedCount.post + helpUsedCount.artwork,
+                    helpUsed: helpUsedCount.pre + helpUsedCount.post + helpUsedCount.artwork + (helpUsedCount.quiz || 0),
+                    quizCorrect,
+                    quizTotal: TRICKY_QUIZZES.length,
+                    quizHelpUsed,
                     matchedCount: matchedPairs.length,
                     sortedCount: sortedTrash.length
                 };
@@ -1541,6 +1611,185 @@
             };
 
             // ============================================================
+            // 헷갈리는 분리수거 퀴즈 컴포넌트
+            // ============================================================
+            const TrickyQuiz = ({ onComplete, onHelpUsed, speak, playEffect }) => {
+                const [idx, setIdx] = useState(0);
+                const [results, setResults] = useState([]);
+                const [showHint, setShowHint] = useState(false);
+                const [feedback, setFeedback] = useState(null); // {correct, message}
+                const [helpThis, setHelpThis] = useState(false);
+
+                const current = TRICKY_QUIZZES[idx];
+
+                const handleHint = () => {
+                    setShowHint(true);
+                    setHelpThis(true);
+                    onHelpUsed();
+                    speak(current.hint);
+                };
+
+                const handleAnswer = (binId) => {
+                    const correct = binId === current.answer;
+                    if (correct) {
+                        playEffect('correct');
+                        triggerCelebration('normal');
+                        speak(`정답이에요! ${current.hint}`);
+                        setFeedback({ correct: true, message: '정답이에요! 🎉' });
+                    } else {
+                        playEffect('wrong');
+                        speak('아쉬워요! 힌트를 보고 다시 생각해봐요.');
+                        setFeedback({ correct: false, message: `아쉬워요! 정답은 "${current.answer}" 예요.` });
+                    }
+                    setTimeout(() => {
+                        const newResults = [...results, { id: current.id, correct, helpUsed: helpThis }];
+                        setResults(newResults);
+                        if (idx + 1 < TRICKY_QUIZZES.length) {
+                            setIdx(idx + 1);
+                            setShowHint(false);
+                            setHelpThis(false);
+                            setFeedback(null);
+                        } else {
+                            onComplete(newResults);
+                        }
+                    }, 2200);
+                };
+
+                return (
+                    <div className="bg-white p-8 rounded-[3rem] shadow-2xl w-full max-w-5xl flex flex-col gap-5 border-8 border-orange-300">
+
+                        <div className="text-center">
+                            <h2 className="text-5xl font-black text-orange-800 mb-2">🤔 헷갈리는 분리수거 퀴즈!</h2>
+                            <p className="text-2xl font-bold text-orange-600 bg-orange-50 px-6 py-2 rounded-full inline-block">
+                                ({idx + 1} / {TRICKY_QUIZZES.length})
+                            </p>
+                        </div>
+
+                        {/* 문제 */}
+                        <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border-4 border-orange-300 rounded-3xl p-8 text-center">
+                            <div className="text-[7rem] leading-none mb-3">{current.icon}</div>
+                            <p className="text-4xl font-bold text-slate-800 break-keep leading-tight">{current.question}</p>
+                        </div>
+
+                        {/* 도움받기/힌트 영역 */}
+                        <div className="bg-blue-50 border-4 border-blue-300 rounded-3xl p-5">
+                            {!showHint ? (
+                                <button onClick={handleHint}
+                                    className="w-full bg-blue-500 text-white py-4 rounded-full text-2xl font-bold hover:bg-blue-600 active:scale-95 flex items-center justify-center gap-3">
+                                    <Icon name="HelpCircle" size={32} /> 💡 모르겠어요! 힌트 보기
+                                </button>
+                            ) : (
+                                <div className="flex flex-col gap-3">
+                                    <p className="text-2xl font-bold text-blue-900 leading-relaxed break-keep">💡 {current.hint}</p>
+                                    <button onClick={() => speak(current.hint)}
+                                        className="bg-blue-300 text-blue-900 py-2 rounded-full text-xl font-bold hover:bg-blue-400 active:scale-95 flex items-center justify-center gap-2">
+                                        <Icon name="Volume2" size={24} /> 다시 들어볼게요
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* 답 고르기 */}
+                        <div>
+                            <p className="text-2xl font-bold text-slate-700 mb-3 text-center">👇 알맞은 곳을 골라주세요!</p>
+                            <div className="grid grid-cols-3 gap-3">
+                                {QUIZ_BINS_FOR_CHOICE.map(bin => (
+                                    <button key={bin.id} onClick={() => handleAnswer(bin.id)}
+                                        disabled={feedback !== null}
+                                        className="p-4 rounded-3xl border-4 border-slate-300 bg-white hover:bg-orange-50 hover:border-orange-400 active:scale-95 flex flex-col items-center justify-center disabled:opacity-50">
+                                        <span className="text-[3.5rem] leading-none">{bin.icon}</span>
+                                        <span className="text-2xl font-bold text-slate-700 mt-1">{bin.name}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* 피드백 */}
+                        <AnimatePresence>
+                            {feedback && (
+                                <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+                                    className="absolute inset-0 bg-black/60 z-50 flex items-center justify-center rounded-[3rem] p-8">
+                                    <div className={`bg-white px-12 py-10 rounded-[3rem] border-8 ${feedback.correct ? 'border-green-400' : 'border-orange-400'} max-w-3xl text-center shadow-2xl flex flex-col gap-4`}>
+                                        <div className="text-[7rem] leading-none">{feedback.correct ? '🎉' : '🤔'}</div>
+                                        <h3 className={`text-5xl font-black ${feedback.correct ? 'text-green-600' : 'text-orange-500'}`}>{feedback.message}</h3>
+                                        <p className="text-2xl font-bold text-slate-700 leading-relaxed break-keep">{current.hint}</p>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+                );
+            };
+
+            // ============================================================
+            // 설계도 영상 재생 + 자기평가 컴포넌트
+            // ============================================================
+            const BlueprintReviewComponent = ({ videoData, imageData, stars, setStars, onNext, speak, playEffect }) => {
+                const hasVideo = !!videoData;
+
+                return (
+                    <div className="bg-white p-8 rounded-[3rem] shadow-2xl w-full max-w-5xl flex flex-col gap-5 border-8 border-purple-300">
+
+                        <div className="text-center">
+                            <h2 className="text-5xl font-black text-purple-800 mb-2">🎬 내 설계도 다시 보기!</h2>
+                            <p className="text-2xl font-bold text-purple-600 bg-purple-50 px-6 py-2 rounded-full inline-block">
+                                내가 무엇을 만들 건지 잘 설명했나요? 다시 보고 별점을 줘봐요!
+                            </p>
+                        </div>
+
+                        {/* 영상 또는 이미지 */}
+                        <div className="bg-slate-100 rounded-3xl border-8 border-slate-300 overflow-hidden">
+                            {hasVideo ? (
+                                <video
+                                    src={videoData}
+                                    controls
+                                    className="w-full max-h-[400px] bg-black"
+                                />
+                            ) : imageData ? (
+                                <div className="relative">
+                                    <img src={imageData} alt="설계도" className="w-full max-h-[400px] object-contain bg-white" />
+                                    <div className="absolute top-3 left-3 bg-yellow-100 border-2 border-yellow-400 px-4 py-2 rounded-full text-lg font-bold text-yellow-800">
+                                        💡 영상이 없어서 그림만 보여드려요
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="p-12 text-center text-2xl font-bold text-slate-400">
+                                    설계도가 없어요. 다음으로 넘어가요!
+                                </div>
+                            )}
+                        </div>
+
+                        {/* 자기평가 안내 + 별점 */}
+                        <div className="bg-yellow-50 border-4 border-yellow-300 rounded-3xl p-5 flex flex-col gap-4">
+                            <p className="text-3xl font-bold text-yellow-900 text-center">⭐ 내 설계도, 어땠어요?</p>
+                            <p className="text-xl font-bold text-yellow-700 text-center leading-relaxed">
+                                "무엇을 만들 건지" 잘 말했나요?<br />
+                                그림을 자세히 그렸나요?
+                            </p>
+                            <div className="flex gap-3 justify-center">
+                                {[1, 2, 3, 4, 5].map(n => (
+                                    <button key={n} onClick={() => {
+                                        setStars(n);
+                                        playEffect('correct');
+                                        if (n >= 4) triggerCelebration('normal');
+                                    }} className="star-btn">
+                                        <Icon name="Star" size={60}
+                                            className={stars >= n ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300 fill-gray-100'} />
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* 다음 버튼 */}
+                        <button onClick={onNext}
+                            className="w-full bg-purple-500 text-white py-5 rounded-full text-3xl font-bold shadow-lg hover:bg-purple-600 active:scale-95">
+                            다음으로 →
+                        </button>
+                    </div>
+                );
+            };
+
+            // ============================================================
             // 마이크 권한 게이트 화면
             // ============================================================
             if (showMicGate) {
@@ -1843,9 +2092,25 @@
                                     </motion.div>
                                 )}
 
-                                {/* STEP 4: Matching Game */}
+                                {/* STEP 4: 헷갈리는 분리수거 퀴즈 (NEW!) */}
                                 {step === 4 && (
-                                    <motion.div key="step4" className="absolute inset-0 flex flex-col items-center justify-center p-10 bg-gradient-to-b from-indigo-50 to-purple-50"
+                                    <motion.div key="step4" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-orange-50 to-amber-50 overflow-y-auto hide-scrollbar"
+                                        initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.05 }}>
+                                        <TrickyQuiz
+                                            onComplete={(results) => {
+                                                setQuizResults(results);
+                                                handleNextStep();
+                                            }}
+                                            onHelpUsed={() => setHelpUsedCount(prev => ({ ...prev, quiz: (prev.quiz || 0) + 1 }))}
+                                            speak={speak}
+                                            playEffect={playEffect}
+                                        />
+                                    </motion.div>
+                                )}
+
+                                {/* STEP 5: Matching Game (이전 STEP 4) */}
+                                {step === 5 && (
+                                    <motion.div key="step5" className="absolute inset-0 flex flex-col items-center justify-center p-10 bg-gradient-to-b from-indigo-50 to-purple-50"
                                         initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.05 }}>
                                         <div className="bg-white p-10 rounded-[3rem] shadow-2xl w-full max-w-[1500px] h-full max-h-[950px] flex flex-col border-8 border-purple-300 relative">
 
@@ -1967,9 +2232,9 @@
                                     </motion.div>
                                 )}
 
-                                {/* STEP 5: Artwork Name Record */}
-                                {step === 5 && (
-                                    <motion.div key="step5" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-blue-50 to-indigo-50 overflow-y-auto hide-scrollbar"
+                                {/* STEP 6: Artwork Name Record (이전 STEP 5) */}
+                                {step === 6 && (
+                                    <motion.div key="step6" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-blue-50 to-indigo-50 overflow-y-auto hide-scrollbar"
                                         initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.05 }}>
 
                                         <div className="bg-white p-6 rounded-[3rem] shadow-2xl w-full max-w-[1700px] flex flex-col border-8 border-indigo-300">
@@ -2024,9 +2289,9 @@
                                     </motion.div>
                                 )}
 
-                                {/* STEP 6: Blueprint */}
-                                {step === 6 && (
-                                    <motion.div key="step6" className="absolute inset-0 bg-slate-50"
+                                {/* STEP 7: Blueprint (이전 STEP 6) */}
+                                {step === 7 && (
+                                    <motion.div key="step7" className="absolute inset-0 bg-slate-50"
                                         initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.05 }}>
                                         <BlueprintComponent
                                             onComplete={(base64) => {
@@ -2037,9 +2302,25 @@
                                     </motion.div>
                                 )}
 
-                                {/* STEP 7: Real Photo */}
-                                {step === 7 && (
-                                    <motion.div key="step7" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-teal-50 to-emerald-50"
+                                {/* STEP 8: 설계도 영상 재생 + 자기평가 (NEW!) */}
+                                {step === 8 && (
+                                    <motion.div key="step8" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-purple-50 to-pink-50 overflow-y-auto hide-scrollbar"
+                                        initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.05 }}>
+                                        <BlueprintReviewComponent
+                                            videoData={blueprintScreenRec}
+                                            imageData={blueprintData}
+                                            stars={blueprintSelfStars}
+                                            setStars={setBlueprintSelfStars}
+                                            onNext={handleNextStep}
+                                            speak={speak}
+                                            playEffect={playEffect}
+                                        />
+                                    </motion.div>
+                                )}
+
+                                {/* STEP 9: Real Photo (이전 STEP 7) */}
+                                {step === 9 && (
+                                    <motion.div key="step9" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-teal-50 to-emerald-50"
                                         initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.05 }}>
                                         <div className="bg-white p-12 rounded-[3rem] shadow-2xl w-full max-w-5xl flex flex-col items-center gap-6 border-8 border-teal-300 text-center">
                                             <h2 className="text-5xl font-bold text-teal-800">🎉 오늘 활동 참 잘했어요!</h2>
@@ -2076,19 +2357,26 @@
                                     </motion.div>
                                 )}
 
-                                {/* STEP 8: Post-record (성찰) */}
-                                {step === 8 && (
-                                    <motion.div key="step8" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-green-50 to-teal-50 overflow-y-auto hide-scrollbar"
+                                {/* STEP 10: Post-record (의미 설명 추가 / 이전 STEP 8) */}
+                                {step === 10 && (
+                                    <motion.div key="step10" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-green-50 to-teal-50 overflow-y-auto hide-scrollbar"
                                         initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }}>
-                                        <div className="bg-white px-10 py-5 rounded-full shadow-sm border-4 border-teal-200 mb-6 text-center max-w-3xl">
-                                            <p className="text-3xl font-bold text-teal-700">🌟 오늘 활동을 떠올려보고, 새롭게 알게 된 점을 말해봐요!</p>
+
+                                        {/* 사후 녹음 의미 설명 */}
+                                        <div className="bg-white px-8 py-5 rounded-3xl shadow-sm border-4 border-emerald-300 mb-4 text-center max-w-3xl">
+                                            <p className="text-2xl font-bold text-emerald-900 mb-2">🌟 활동 후 녹음이에요!</p>
+                                            <p className="text-xl font-bold text-emerald-700 leading-relaxed">
+                                                처음 녹음과 비교해서, 새롭게 알게 된 점을 말해주세요.<br />
+                                                <span className="text-purple-600">"이제는 분리수거 박사가 될 수 있어요!"</span> 처럼요. 🌱
+                                            </p>
                                         </div>
+
                                         <RecorderComponent
                                             defaultText="오늘 활동을 통해 새롭게 알게 된 점은?"
                                             helpKey="post"
                                             exampleList={[
                                                 "오늘 분리수거를 잘하면 쓰레기가 다른 물건으로 변신할 수 있다는 걸 알았어요.",
-                                                "페트병은 깨끗이 씻어서 뚜껑을 떼고 버려야 한다는 걸 배웠어요.",
+                                                "종이컵은 코팅이 있어서 일반쓰레기로 버린다는 걸 새로 알았어요.",
                                                 "앞으로는 집에서도 종이, 플라스틱, 캔을 잘 나누어 버리겠어요."
                                             ]}
                                             onComplete={(data) => {
@@ -2099,17 +2387,17 @@
                                     </motion.div>
                                 )}
 
-                                {/* STEP 9: Evaluation & Submit */}
-                                {step === 9 && (
-                                    <motion.div key="step9" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-yellow-50 to-amber-100"
+                                {/* STEP 11: Evaluation & Submit (이전 STEP 9) */}
+                                {step === 11 && (
+                                    <motion.div key="step11" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-yellow-50 to-amber-100"
                                         initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
 
                                         <div id="certificate-area" className="bg-white p-8 rounded-[3rem] shadow-2xl w-[95%] max-w-[1700px] h-[85%] flex flex-col border-[16px] border-double border-yellow-500 relative">
 
                                             <div className="text-center mb-3 shrink-0">
-                                                <h2 className="text-[3.5rem] font-black text-yellow-800 tracking-widest">🏆 분리수거 대장 임명장 🏆</h2>
+                                                <h2 className="text-[3.5rem] font-black text-yellow-800 tracking-widest">🏆 분리수거 박사 임명장 🏆</h2>
                                                 <p className="text-2xl font-bold text-slate-700">
-                                                    이름: <span className="text-blue-700 underline decoration-wavy decoration-blue-300">{studentName}</span> 대장
+                                                    이름: <span className="text-blue-700 underline decoration-wavy decoration-blue-300">{studentName}</span> 박사
                                                     {artworkNameData?.text && <span className="ml-6 text-slate-400">| 작품명: <span className="text-green-700 font-black">{artworkNameData.text}</span></span>}
                                                 </p>
                                             </div>
@@ -2138,7 +2426,7 @@
 
                                                 <div className="flex-1 flex flex-col gap-3 min-h-0">
                                                     <div className="bg-blue-50 border-4 border-blue-200 rounded-3xl p-4 flex-1 flex flex-col shadow-inner overflow-hidden min-h-0">
-                                                        <h3 className="text-2xl font-bold text-blue-800 mb-2 shrink-0">💡 내가 아는 분리수거</h3>
+                                                        <h3 className="text-2xl font-bold text-blue-800 mb-2 shrink-0">💡 활동 전 - 내가 아는 분리수거</h3>
                                                         <div className="flex-1 overflow-y-auto hide-scrollbar min-h-0">
                                                             <p className="text-xl font-bold text-slate-700 leading-relaxed">
                                                                 {preRecordData?.text || "녹음하지 않았어요."}
@@ -2146,7 +2434,7 @@
                                                         </div>
                                                     </div>
                                                     <div className="bg-emerald-50 border-4 border-emerald-200 rounded-3xl p-4 flex-1 flex flex-col shadow-inner overflow-hidden min-h-0">
-                                                        <h3 className="text-2xl font-bold text-emerald-800 mb-2 shrink-0">🌟 새롭게 알게 된 점</h3>
+                                                        <h3 className="text-2xl font-bold text-emerald-800 mb-2 shrink-0">🌟 활동 후 - 새롭게 알게 된 점</h3>
                                                         <div className="flex-1 overflow-y-auto hide-scrollbar min-h-0">
                                                             <p className="text-xl font-bold text-slate-700 leading-relaxed">
                                                                 {postRecordData?.text || "녹음하지 않았어요."}
@@ -2166,7 +2454,7 @@
                                                         <span className="text-xl font-bold text-orange-600">다시 도전해봐요! 💪</span>
                                                     )}
                                                     {stars >= 4 && (
-                                                        <span className="text-xl font-bold text-green-600">최고의 대장! 🌟</span>
+                                                        <span className="text-xl font-bold text-green-600">최고의 박사! 🌟</span>
                                                     )}
                                                 </div>
 
