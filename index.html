@@ -1049,7 +1049,7 @@
             // ============================================================
             // 녹음 컴포넌트 (개선판: 키보드 입력, 도움받기, 자기 별점, 다시 녹음, 칭찬 스티커)
             // ============================================================
-            const RecorderComponent = ({ onComplete, defaultText, helpKey, exampleList, showSelfRating = true, showSticker = true }) => {
+            const RecorderComponent = ({ onComplete, defaultText, helpKey, exampleList, showSelfRating = false, showSticker = false }) => {
                 const [isRecording, setIsRecording] = useState(false);
                 const [text, setText] = useState("");
                 const [audioBase64, setAudioBase64] = useState(null);
@@ -2636,8 +2636,11 @@
                                         </div>
 
                                         <RecorderComponent
+                                            key="recorder-post"
                                             defaultText="오늘 활동을 통해 새롭게 알게 된 점은?"
                                             helpKey="post"
+                                            showSelfRating={true}
+                                            showSticker={true}
                                             exampleList={[
                                                 "오늘 분리수거를 잘하면 쓰레기가 다른 물건으로 변신할 수 있다는 걸 알았어요.",
                                                 "종이컵은 코팅이 있어서 일반쓰레기로 버린다는 걸 새로 알았어요.",
