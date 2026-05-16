@@ -1245,7 +1245,7 @@
                             </button>
                         )}
 
-                        {/* review: 들어보고 별점 주기 (조건부) */}
+                        {/* review: 들어보기 단계 */}
                         {phase === 'review' && (
                             <div className="w-full flex flex-col gap-5">
                                 {/* 듣기 버튼들 */}
@@ -1264,15 +1264,28 @@
                                     )}
                                 </div>
 
-                                {/* 별점은 showSelfRating=true일 때만 (사후 녹음 전용) */}
+                                {/* ===== CASE A: 별점 없는 녹음 (사전·중간) ===== */}
+                                {!showSelfRating && (
+                                    <div className="flex gap-3 flex-wrap">
+                                        <button onClick={retryRecord}
+                                            className="flex-1 min-w-[200px] bg-blue-400 text-white px-6 py-4 rounded-full text-2xl font-bold hover:bg-blue-500 active:scale-95">
+                                            🔄 다시 녹음할래요
+                                        </button>
+                                        <button onClick={() => onComplete({ text: textRef.current, base64: audioBase64, selfStars: 0, helpCount, sticker: null })}
+                                            className="flex-1 min-w-[200px] bg-green-500 text-white px-6 py-4 rounded-full text-2xl font-bold hover:bg-green-600 active:scale-95">
+                                            다음으로 →
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* ===== CASE B: 별점 있는 녹음 (사후) ===== */}
                                 {showSelfRating && (
                                     <>
                                         <div className="bg-yellow-50 border-4 border-yellow-300 rounded-3xl p-5">
                                             <p className="text-3xl font-bold text-yellow-800 text-center mb-3">⭐ 내 녹음, 어떤 것 같아요?</p>
                                             <div className="flex gap-3 justify-center">
                                                 {[1, 2, 3, 4, 5].map(n => (
-                                                    <button key={n} onClick={() => handleSelfStar(n)}
-                                                        className="star-btn">
+                                                    <button key={n} onClick={() => handleSelfStar(n)} className="star-btn">
                                                         <Icon name="Star" size={60}
                                                             className={selfStars >= n ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300 fill-gray-100'} />
                                                     </button>
@@ -1280,7 +1293,6 @@
                                             </div>
                                         </div>
 
-                                        {/* 별점 결과에 따른 안내 */}
                                         {selfStars > 0 && selfStars <= 3 && (
                                             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                                                 className="bg-orange-50 border-4 border-orange-300 rounded-3xl p-5 text-center">
@@ -1318,28 +1330,7 @@
                                     </>
                                 )}
 
-                                {/* 별점 없는 경우 (사전·중간 녹음): 바로 다음 버튼 */}
-                                {!showSelfRating && (audioBlob || text) && (
-                                    <div className="flex gap-3 flex-wrap">
-                                        <button onClick={retryRecord}
-                                            className="flex-1 min-w-[200px] bg-blue-400 text-white px-6 py-4 rounded-full text-2xl font-bold hover:bg-blue-500 active:scale-95">
-                                            🔄 다시 녹음할래요
-                                        </button>
-                                        <button onClick={() => onComplete({ text: textRef.current, base64: audioBase64, selfStars: 0, helpCount, sticker: null })}
-                                            className="flex-1 min-w-[200px] bg-green-500 text-white px-6 py-4 rounded-full text-2xl font-bold hover:bg-green-600 active:scale-95">
-                                            다음으로 →
-                                        </button>
-                                    </div>
-                                )}
-
-                                {/* 키보드만 사용한 경우 (별점 표시 안 함) */}
-                                {showSelfRating && selfStars === 0 && text && !audioBlob && (
-                                    <button onClick={() => showSticker ? setPhase('sticker') : finalSubmit()}
-                                        className="w-full bg-green-500 text-white py-5 rounded-full text-3xl font-bold hover:bg-green-600 active:scale-95">
-                                        다음으로 →
-                                    </button>
-                                )}
-
+                                {/* ===== 녹음·입력 둘 다 없을 때: 건너뛰기 ===== */}
                                 {!text && !audioBlob && (
                                     <button onClick={() => onComplete({ text: "", base64: null, selfStars: 0, helpCount, sticker: null })}
                                         className="w-full bg-gray-300 text-gray-700 py-5 rounded-full text-2xl font-bold hover:bg-gray-400 active:scale-95">
@@ -1349,8 +1340,8 @@
                             </div>
                         )}
 
-                        {/* sticker: 칭찬 스티커 받기 */}
-                        {phase === 'sticker' && (
+                        {/* sticker: 칭찬 스티커 받기 (showSticker=true일 때만) */}
+                        {phase === 'sticker' && showSticker && (
                             <div className="w-full flex flex-col gap-5">
                                 <StickerReward
                                     label="녹음 완료 스티커"
@@ -1366,6 +1357,8 @@
                                 </button>
                             </div>
                         )}
+                        {/* 안전장치: showSticker=false인데 sticker phase면 바로 완료 */}
+                        {phase === 'sticker' && !showSticker && (() => { finalSubmit(); return null; })()}
                     </div>
                 );
             };
