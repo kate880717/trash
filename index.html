@@ -23,7 +23,7 @@
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
 
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Jua&family=Gaegu:wght@400;700&family=Nunito:wght@700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Jua&family=Nanum+Gothic:wght@700;800&display=swap');
 
         html {
             font-size: 16px;
@@ -32,12 +32,18 @@
         body {
             margin: 0;
             overflow: hidden;
-            font-family: 'Jua', 'Gaegu', sans-serif;
+            font-family: 'Nanum Gothic', 'Jua', sans-serif;
+            font-weight: 800;
             background-color: #111827;
             touch-action: none;
             user-select: none;
             width: 100vw;
             height: 100vh;
+        }
+
+        /* 제목·큰 글씨는 Jua */
+        h1, h2, h3, .font-display {
+            font-family: 'Jua', 'Nanum Gothic', sans-serif;
         }
 
         .hide-scrollbar::-webkit-scrollbar {
@@ -198,6 +204,192 @@
             return <div ref={iconRef} className="inline-flex" />;
         };
 
+        // ============================================================
+        // 직접 그린 SVG 아이콘들 (이모지로 표현 안 되는 것들)
+        // ============================================================
+        const TrashSVG = ({ type, size = 100 }) => {
+            const s = size;
+            switch (type) {
+                case 'paper-cup': // 종이컵 (커피숍 테이크아웃 컵)
+                    return (
+                        <svg width={s} height={s} viewBox="0 0 100 100">
+                            {/* 컵 뚜껑 */}
+                            <ellipse cx="50" cy="22" rx="32" ry="6" fill="#8B5E3C" />
+                            <rect x="18" y="22" width="64" height="6" fill="#A0714E" />
+                            {/* 빨대 */}
+                            <rect x="56" y="6" width="6" height="22" rx="2" fill="#E74C3C" />
+                            <rect x="56" y="6" width="3" height="22" rx="1" fill="#FFFFFF" opacity="0.4" />
+                            {/* 컵 본체 (사다리꼴) */}
+                            <path d="M 22 28 L 78 28 L 72 88 L 28 88 Z" fill="#FFFFFF" stroke="#333" strokeWidth="2" />
+                            {/* 컵 띠지 (종이컵 표시) */}
+                            <path d="M 24 42 L 76 42 L 74 56 L 26 56 Z" fill="#C9A87C" />
+                            <text x="50" y="53" fontSize="9" fontWeight="bold" fill="#5C3A1A" textAnchor="middle">COFFEE</text>
+                            {/* 컵 바닥 */}
+                            <ellipse cx="50" cy="88" rx="22" ry="3" fill="#E8E8E8" />
+                        </svg>
+                    );
+                case 'pet-bottle': // 페트병 (음료수)
+                    return (
+                        <svg width={s} height={s} viewBox="0 0 100 100">
+                            {/* 뚜껑 */}
+                            <rect x="40" y="6" width="20" height="10" rx="2" fill="#2196F3" />
+                            <rect x="40" y="6" width="20" height="3" fill="#1976D2" />
+                            {/* 병 목 */}
+                            <rect x="42" y="16" width="16" height="10" fill="#E3F2FD" stroke="#90CAF9" strokeWidth="1.5" />
+                            {/* 병 어깨 */}
+                            <path d="M 42 26 L 42 32 Q 28 36 28 46 L 28 82 Q 28 90 38 90 L 62 90 Q 72 90 72 82 L 72 46 Q 72 36 58 32 L 58 26 Z"
+                                fill="#E3F2FD" stroke="#1976D2" strokeWidth="2" />
+                            {/* 라벨 */}
+                            <rect x="30" y="50" width="40" height="22" fill="#FFEB3B" stroke="#F57F17" strokeWidth="1.5" />
+                            <text x="50" y="64" fontSize="9" fontWeight="bold" fill="#E65100" textAnchor="middle">JUICE</text>
+                            {/* 물 반짝임 */}
+                            <ellipse cx="36" cy="50" rx="3" ry="10" fill="#FFFFFF" opacity="0.6" />
+                        </svg>
+                    );
+                case 'milk-carton': // 우유팩 (테트라팩)
+                    return (
+                        <svg width={s} height={s} viewBox="0 0 100 100">
+                            {/* 윗부분 (지붕 모양) */}
+                            <path d="M 22 24 L 50 8 L 78 24 L 78 30 L 22 30 Z"
+                                fill="#FFFFFF" stroke="#333" strokeWidth="2" />
+                            <line x1="50" y1="8" x2="50" y2="30" stroke="#333" strokeWidth="2" />
+                            {/* 본체 */}
+                            <rect x="22" y="30" width="56" height="60" fill="#FFFFFF" stroke="#333" strokeWidth="2" />
+                            {/* 우유 그림 (소) */}
+                            <circle cx="50" cy="50" r="11" fill="#FFE0B2" />
+                            <ellipse cx="46" cy="48" rx="2" ry="3" fill="#333" />
+                            <ellipse cx="54" cy="48" rx="2" ry="3" fill="#333" />
+                            <path d="M 44 54 Q 50 58 56 54" stroke="#333" strokeWidth="1.5" fill="none" />
+                            {/* MILK 글자 */}
+                            <rect x="28" y="68" width="44" height="14" fill="#1976D2" />
+                            <text x="50" y="79" fontSize="11" fontWeight="bold" fill="#FFFFFF" textAnchor="middle">MILK</text>
+                        </svg>
+                    );
+                case 'receipt': // 영수증
+                    return (
+                        <svg width={s} height={s} viewBox="0 0 100 100">
+                            {/* 영수증 종이 (긴 직사각형, 끝이 톱니) */}
+                            <path d="M 30 6 L 70 6 L 70 84 L 65 90 L 60 84 L 55 90 L 50 84 L 45 90 L 40 84 L 35 90 L 30 84 Z"
+                                fill="#FAFAFA" stroke="#999" strokeWidth="1.5" />
+                            {/* 가게 이름 */}
+                            <text x="50" y="18" fontSize="7" fontWeight="bold" fill="#333" textAnchor="middle">★ MART ★</text>
+                            {/* 줄들 */}
+                            <line x1="35" y1="26" x2="65" y2="26" stroke="#BBB" strokeWidth="1" strokeDasharray="2 1" />
+                            <text x="35" y="36" fontSize="6" fill="#666">우유</text>
+                            <text x="65" y="36" fontSize="6" fill="#666" textAnchor="end">1,500</text>
+                            <text x="35" y="46" fontSize="6" fill="#666">빵</text>
+                            <text x="65" y="46" fontSize="6" fill="#666" textAnchor="end">2,000</text>
+                            <text x="35" y="56" fontSize="6" fill="#666">사과</text>
+                            <text x="65" y="56" fontSize="6" fill="#666" textAnchor="end">3,500</text>
+                            <line x1="35" y1="62" x2="65" y2="62" stroke="#BBB" strokeWidth="1" strokeDasharray="2 1" />
+                            <text x="35" y="74" fontSize="7" fontWeight="bold" fill="#333">합계</text>
+                            <text x="65" y="74" fontSize="7" fontWeight="bold" fill="#333" textAnchor="end">7,000</text>
+                        </svg>
+                    );
+                case 'tissue': // 사용한 휴지
+                    return (
+                        <svg width={s} height={s} viewBox="0 0 100 100">
+                            {/* 구겨진 휴지 (곡선들) */}
+                            <path d="M 20 55 Q 15 40 25 30 Q 35 22 50 25 Q 65 22 75 30 Q 85 40 80 55 Q 85 70 75 78 Q 60 85 50 80 Q 35 85 25 78 Q 15 70 20 55 Z"
+                                fill="#FFFFFF" stroke="#888" strokeWidth="2" />
+                            {/* 구김 선들 */}
+                            <path d="M 30 40 Q 38 48 35 58" stroke="#CCC" strokeWidth="1.5" fill="none" />
+                            <path d="M 60 35 Q 55 45 62 55" stroke="#CCC" strokeWidth="1.5" fill="none" />
+                            <path d="M 45 50 Q 50 60 45 70" stroke="#CCC" strokeWidth="1.5" fill="none" />
+                            <path d="M 70 50 Q 75 60 70 70" stroke="#CCC" strokeWidth="1.5" fill="none" />
+                            {/* 사용 흔적 (옅은 노란 얼룩) */}
+                            <ellipse cx="55" cy="55" rx="8" ry="6" fill="#FFF59D" opacity="0.5" />
+                        </svg>
+                    );
+                case 'plastic-bag': // 비닐봉투
+                    return (
+                        <svg width={s} height={s} viewBox="0 0 100 100">
+                            {/* 손잡이 */}
+                            <path d="M 30 18 Q 30 10 38 10 L 42 10 Q 50 10 50 18" stroke="#1976D2" strokeWidth="3" fill="none" />
+                            <path d="M 50 18 Q 50 10 58 10 L 62 10 Q 70 10 70 18" stroke="#1976D2" strokeWidth="3" fill="none" />
+                            {/* 봉투 본체 */}
+                            <path d="M 22 20 L 78 20 L 74 90 L 26 90 Z"
+                                fill="#64B5F6" stroke="#1565C0" strokeWidth="2" />
+                            {/* 줄무늬 */}
+                            <line x1="35" y1="30" x2="35" y2="85" stroke="#1976D2" strokeWidth="1.5" opacity="0.6" />
+                            <line x1="50" y1="30" x2="50" y2="85" stroke="#1976D2" strokeWidth="1.5" opacity="0.6" />
+                            <line x1="65" y1="30" x2="65" y2="85" stroke="#1976D2" strokeWidth="1.5" opacity="0.6" />
+                            {/* 마트 로고 */}
+                            <circle cx="50" cy="55" r="12" fill="#FFEB3B" />
+                            <text x="50" y="59" fontSize="8" fontWeight="bold" fill="#E65100" textAnchor="middle">MART</text>
+                        </svg>
+                    );
+                case 'plastic-cup': // 플라스틱 컵 (재활용 가능)
+                    return (
+                        <svg width={s} height={s} viewBox="0 0 100 100">
+                            {/* 컵 (투명한 사다리꼴) */}
+                            <path d="M 22 18 L 78 18 L 72 88 L 28 88 Z"
+                                fill="#E1F5FE" stroke="#0277BD" strokeWidth="2" opacity="0.85" />
+                            {/* 빨대 */}
+                            <rect x="48" y="4" width="6" height="22" rx="1" fill="#F44336" />
+                            {/* 음료 (반쯤) */}
+                            <path d="M 26 50 L 74 50 L 72 88 L 28 88 Z" fill="#FFC107" opacity="0.7" />
+                            {/* 반짝임 */}
+                            <ellipse cx="34" cy="40" rx="3" ry="12" fill="#FFFFFF" opacity="0.7" />
+                            {/* ♻️ 마크 */}
+                            <text x="50" y="78" fontSize="14" textAnchor="middle">♻</text>
+                        </svg>
+                    );
+                case 'paper-box': // 종이상자
+                    return (
+                        <svg width={s} height={s} viewBox="0 0 100 100">
+                            {/* 상자 윗면 */}
+                            <path d="M 18 28 L 50 16 L 82 28 L 50 40 Z"
+                                fill="#D7A86E" stroke="#8B4513" strokeWidth="2" />
+                            {/* 왼쪽 면 */}
+                            <path d="M 18 28 L 18 76 L 50 88 L 50 40 Z"
+                                fill="#C19A6B" stroke="#8B4513" strokeWidth="2" />
+                            {/* 오른쪽 면 */}
+                            <path d="M 82 28 L 82 76 L 50 88 L 50 40 Z"
+                                fill="#A67B5B" stroke="#8B4513" strokeWidth="2" />
+                            {/* 테이프 */}
+                            <path d="M 30 22 L 62 10 L 70 14 L 38 26 Z" fill="#FFEB3B" opacity="0.8" stroke="#F57F17" strokeWidth="1" />
+                        </svg>
+                    );
+                case 'glass-bottle': // 유리병
+                    return (
+                        <svg width={s} height={s} viewBox="0 0 100 100">
+                            {/* 뚜껑 */}
+                            <rect x="42" y="8" width="16" height="8" fill="#D32F2F" />
+                            {/* 병 목 */}
+                            <rect x="44" y="16" width="12" height="14" fill="#A5D6A7" stroke="#2E7D32" strokeWidth="1.5" />
+                            {/* 병 본체 */}
+                            <path d="M 44 30 Q 32 36 32 46 L 32 84 Q 32 90 38 90 L 62 90 Q 68 90 68 84 L 68 46 Q 68 36 56 30 Z"
+                                fill="#81C784" stroke="#2E7D32" strokeWidth="2" />
+                            {/* 라벨 */}
+                            <rect x="36" y="52" width="28" height="20" fill="#FFFFFF" stroke="#2E7D32" strokeWidth="1.5" />
+                            <text x="50" y="65" fontSize="8" fontWeight="bold" fill="#2E7D32" textAnchor="middle">JAM</text>
+                            {/* 반짝임 */}
+                            <ellipse cx="38" cy="50" rx="2" ry="10" fill="#FFFFFF" opacity="0.7" />
+                        </svg>
+                    );
+                case 'can': // 캔
+                    return (
+                        <svg width={s} height={s} viewBox="0 0 100 100">
+                            {/* 캔 윗면 */}
+                            <ellipse cx="50" cy="20" rx="22" ry="6" fill="#BDBDBD" stroke="#616161" strokeWidth="2" />
+                            {/* 캔 본체 */}
+                            <rect x="28" y="20" width="44" height="62" fill="#E0E0E0" stroke="#616161" strokeWidth="2" />
+                            {/* 라벨 */}
+                            <rect x="28" y="32" width="44" height="36" fill="#F44336" stroke="#B71C1C" strokeWidth="1.5" />
+                            <text x="50" y="50" fontSize="9" fontWeight="bold" fill="#FFFFFF" textAnchor="middle">참치</text>
+                            <text x="50" y="62" fontSize="7" fontWeight="bold" fill="#FFFFFF" textAnchor="middle">TUNA</text>
+                            {/* 캔 바닥 */}
+                            <ellipse cx="50" cy="82" rx="22" ry="4" fill="#9E9E9E" stroke="#616161" strokeWidth="1.5" />
+                            {/* 따개 고리 */}
+                            <ellipse cx="50" cy="20" rx="6" ry="2" fill="#9E9E9E" />
+                        </svg>
+                    );
+                default:
+                    return null;
+            }
+        };
+
         const BIN_TYPES = [
             { id: '플라스틱류', name: '플라스틱', icon: '🥤', color: 'bg-blue-100 text-blue-800 border-blue-400' },
             { id: '종이류', name: '종이', icon: '📦', color: 'bg-yellow-100 text-yellow-800 border-yellow-400' },
@@ -207,47 +399,47 @@
             { id: '일반쓰레기', name: '일반쓰레기', icon: '🗑️', color: 'bg-stone-200 text-stone-800 border-stone-500' }
         ];
 
-        // 분리수거 헷갈리는 퀴즈 (개념학습) - 정답+힌트 포함
+        // 분리수거 헷갈리는 퀴즈 (개념학습) - SVG 그림 사용
         const TRICKY_QUIZZES = [
             {
                 id: 'paper-cup',
-                icon: '🥤',
-                question: '종이컵은 어떻게 분류할까요?',
+                svgType: 'paper-cup',
+                question: '커피숍에서 쓰는 종이컵은 어떻게 분류할까요?',
                 answer: '일반쓰레기',
                 hint: '종이컵은 안쪽에 비닐(코팅)이 발라져 있어서 일반 종이와 달라요. 그래서 일반쓰레기로 버려야 해요!'
             },
             {
                 id: 'tissue',
-                icon: '🧻',
-                question: '사용한 휴지는 어떻게 분류할까요?',
+                svgType: 'tissue',
+                question: '사용한 휴지(화장지)는 어떻게 분류할까요?',
                 answer: '일반쓰레기',
                 hint: '사용한 휴지는 물이나 음식이 묻어 있어서 재활용이 안 돼요. 일반쓰레기로 버려요!'
             },
             {
                 id: 'small-paper',
-                icon: '📄',
-                question: '작은 영수증이나 메모지는 어떻게 분류할까요?',
+                svgType: 'receipt',
+                question: '영수증은 어떻게 분류할까요?',
                 answer: '일반쓰레기',
-                hint: '너무 작은 종이나 영수증은 특수 코팅이 되어 있어서 재활용이 안 돼요. 일반쓰레기로 버려요!'
+                hint: '영수증은 특수 코팅이 되어 있어서 재활용이 안 돼요. 일반쓰레기로 버려요!'
             },
             {
                 id: 'pet-bottle',
-                icon: '🥤',
-                question: '페트병은 어떻게 분류할까요?',
+                svgType: 'pet-bottle',
+                question: '음료수 페트병은 어떻게 분류할까요?',
                 answer: '플라스틱류',
                 hint: '페트병은 라벨을 떼고, 안을 깨끗이 씻고, 뚜껑을 빼서 플라스틱류에 버려요!'
             },
             {
                 id: 'milk-carton',
-                icon: '🥛',
-                question: '우유팩은 어떻게 분류할까요?',
+                svgType: 'milk-carton',
+                question: '다 마신 우유팩은 어떻게 분류할까요?',
                 answer: '종이류',
                 hint: '우유팩은 깨끗이 씻어 말려서 종이류에 버려요. 일반 종이와 따로 모으면 더 좋아요!'
             },
             {
                 id: 'plastic-bag',
-                icon: '🛍️',
-                question: '과자봉지나 비닐봉투는 어떻게 분류할까요?',
+                svgType: 'plastic-bag',
+                question: '마트에서 받은 비닐봉투는 어떻게 분류할까요?',
                 answer: '비닐류',
                 hint: '비닐은 비닐류에 따로 모아 버려요. 음식물이 묻었으면 깨끗이 씻어서 버려요!'
             }
@@ -261,6 +453,20 @@
             { id: '비닐류', name: '비닐', icon: '🛍️' },
             { id: '일반쓰레기', name: '일반쓰레기', icon: '🗑️' }
         ];
+
+        // 쓰레기 이름 → SVG 타입 매핑 (구글시트 데이터에서 이름 기준 자동 매칭)
+        const NAME_TO_SVG = {
+            '플라스틱 컵': 'plastic-cup',
+            '종이상자': 'paper-box',
+            '유리병': 'glass-bottle',
+            '통조림 캔': 'can',
+            '비닐 봉투': 'plastic-bag',
+            '종이컵': 'paper-cup',
+            '사용한 휴지': 'tissue',
+            '영수증': 'receipt',
+            '페트병': 'pet-bottle',
+            '우유팩': 'milk-carton'
+        };
 
         const GAS_URL = "https://script.google.com/macros/s/AKfycbyVERNJF2Gcw7AA15cL6FU5mdi2RG1GGrW_4-6-KXyBHy7kLuhUQd8OX4QxxIQXMaT7/exec";
 
@@ -392,10 +598,13 @@
                 if (!GAS_URL || !GAS_URL.startsWith("http")) {
                     setStudents(["김철수", "이영희", "박지민"]);
                     setProblems([
-                        { type: '플라스틱류', name: '플라스틱 컵', icon: '🥤', fact: '플라스틱 컵은\n내용물을 비우고 버려요!' },
-                        { type: '종이류', name: '종이상자', icon: '📦', fact: '종이상자는 테이프를 떼고\n납작하게 접어서 버려요!' },
-                        { type: '병류', name: '유리병', icon: '🫙', fact: '유리병은 깨지지 않게\n조심해서 버려요.' },
-                        { type: '캔류', name: '통조림 캔', icon: '🥫', fact: '통조림 캔은 다 먹고\n안을 깨끗이 씻어서 버려요.' }
+                        { type: '플라스틱류', name: '플라스틱 컵', svgType: 'plastic-cup', icon: '🥤', fact: '플라스틱 컵은\n내용물을 비우고 버려요!' },
+                        { type: '종이류', name: '종이상자', svgType: 'paper-box', icon: '📦', fact: '종이상자는 테이프를 떼고\n납작하게 접어서 버려요!' },
+                        { type: '병류', name: '유리병', svgType: 'glass-bottle', icon: '🫙', fact: '유리병은 깨지지 않게\n조심해서 버려요.' },
+                        { type: '캔류', name: '통조림 캔', svgType: 'can', icon: '🥫', fact: '통조림 캔은 다 먹고\n안을 깨끗이 씻어서 버려요.' },
+                        { type: '비닐류', name: '비닐 봉투', svgType: 'plastic-bag', icon: '🛍️', fact: '비닐은 따로 모아서 버려요.\n바다 생물이 아파해요!' },
+                        { type: '일반쓰레기', name: '종이컵', svgType: 'paper-cup', icon: '☕', fact: '종이컵은 안쪽에 비닐이 발라져 있어요.\n그래서 일반쓰레기로 버려요!' },
+                        { type: '일반쓰레기', name: '사용한 휴지', svgType: 'tissue', icon: '🧻', fact: '사용한 휴지는 재활용이 안 돼요.\n일반쓰레기로 버려요!' }
                     ]);
                     setIsLoading(false);
                     return;
@@ -414,13 +623,22 @@
                                 else if (p.type === '병류' || p.type === '유리류') { newIcon = '🫙'; newName = newName || '유리병'; }
                                 else if (p.type === '캔류') { newIcon = '🥫'; newName = newName || '통조림 캔'; }
                                 else if (p.type === '비닐류') { newIcon = '🛍️'; newName = newName || '비닐 봉투'; }
+                                else if (p.type === '일반쓰레기') { newIcon = p.icon || '🗑️'; newName = newName || '쓰레기'; }
                                 return {
                                     type: p.type,
                                     name: newName,
                                     icon: newIcon,
+                                    svgType: NAME_TO_SVG[newName] || null,  // 이름 기준 SVG 자동 매칭
                                     fact: (p.fact || '분리수거를 잘 합시다!').replace(/\\n/g, '\n')
                                 };
                             }).filter(p => p.type && p.name);
+                            // 일반쓰레기가 없으면 자동 추가 (헷갈리는 것 학습용)
+                            if (!parsed.some(p => p.type === '일반쓰레기')) {
+                                parsed.push(
+                                    { type: '일반쓰레기', name: '종이컵', svgType: 'paper-cup', icon: '☕', fact: '종이컵은 안쪽에 비닐이 발라져 있어요.\n그래서 일반쓰레기로 버려요!' },
+                                    { type: '일반쓰레기', name: '사용한 휴지', svgType: 'tissue', icon: '🧻', fact: '사용한 휴지는 재활용이 안 돼요.\n일반쓰레기로 버려요!' }
+                                );
+                            }
                             setProblems(parsed);
                         }
                         if (data.examples && Array.isArray(data.examples) && data.examples.length > 0) {
@@ -432,10 +650,13 @@
                         console.error(err);
                         setStudents(["김철수", "이영희", "박지민"]);
                         setProblems([
-                            { type: '플라스틱류', name: '플라스틱 컵', icon: '🥤', fact: '플라스틱 컵은\n내용물을 비우고 버려요!' },
-                            { type: '종이류', name: '종이상자', icon: '📦', fact: '종이상자는 테이프를 떼고\n납작하게 접어서 버려요!' },
-                            { type: '병류', name: '유리병', icon: '🫙', fact: '유리병은 깨지지 않게\n조심해서 버려요.' },
-                            { type: '캔류', name: '통조림 캔', icon: '🥫', fact: '통조림 캔은 다 먹고\n안을 깨끗이 씻어서 버려요.' }
+                            { type: '플라스틱류', name: '플라스틱 컵', svgType: 'plastic-cup', icon: '🥤', fact: '플라스틱 컵은\n내용물을 비우고 버려요!' },
+                            { type: '종이류', name: '종이상자', svgType: 'paper-box', icon: '📦', fact: '종이상자는 테이프를 떼고\n납작하게 접어서 버려요!' },
+                            { type: '병류', name: '유리병', svgType: 'glass-bottle', icon: '🫙', fact: '유리병은 깨지지 않게\n조심해서 버려요.' },
+                            { type: '캔류', name: '통조림 캔', svgType: 'can', icon: '🥫', fact: '통조림 캔은 다 먹고\n안을 깨끗이 씻어서 버려요.' },
+                            { type: '비닐류', name: '비닐 봉투', svgType: 'plastic-bag', icon: '🛍️', fact: '비닐은 따로 모아서 버려요.\n바다 생물이 아파해요!' },
+                            { type: '일반쓰레기', name: '종이컵', svgType: 'paper-cup', icon: '☕', fact: '종이컵은 안쪽에 비닐이 발라져 있어요.\n그래서 일반쓰레기로 버려요!' },
+                            { type: '일반쓰레기', name: '사용한 휴지', svgType: 'tissue', icon: '🧻', fact: '사용한 휴지는 재활용이 안 돼요.\n일반쓰레기로 버려요!' }
                         ]);
                         setIsLoading(false);
                     });
@@ -828,7 +1049,7 @@
             // ============================================================
             // 녹음 컴포넌트 (개선판: 키보드 입력, 도움받기, 자기 별점, 다시 녹음, 칭찬 스티커)
             // ============================================================
-            const RecorderComponent = ({ onComplete, defaultText, helpKey, exampleList }) => {
+            const RecorderComponent = ({ onComplete, defaultText, helpKey, exampleList, showSelfRating = true, showSticker = true }) => {
                 const [isRecording, setIsRecording] = useState(false);
                 const [text, setText] = useState("");
                 const [audioBase64, setAudioBase64] = useState(null);
@@ -993,8 +1214,8 @@
                                 value={text}
                                 onChange={e => updateText(e.target.value)}
                                 placeholder={isRecording ? "듣고 있어요..." : "여기에 말한 내용이 나타나거나, 직접 글로 쓸 수 있어요!"}
-                                className="w-full min-h-[10rem] bg-green-50 rounded-2xl p-6 border-4 border-green-200 text-3xl text-gray-800 leading-relaxed focus:outline-none focus:border-green-500"
-                                style={{ fontFamily: 'Gaegu, Jua, sans-serif' }}
+                                className="w-full min-h-[10rem] bg-green-50 rounded-2xl p-6 border-4 border-green-200 text-3xl text-gray-800 leading-relaxed focus:outline-none focus:border-green-500 font-bold"
+                                style={{ fontFamily: "'Nanum Gothic', sans-serif" }}
                             />
                         </div>
 
@@ -1024,7 +1245,7 @@
                             </button>
                         )}
 
-                        {/* review: 들어보고 별점 주기 */}
+                        {/* review: 들어보고 별점 주기 (조건부) */}
                         {phase === 'review' && (
                             <div className="w-full flex flex-col gap-5">
                                 {/* 듣기 버튼들 */}
@@ -1043,65 +1264,83 @@
                                     )}
                                 </div>
 
-                                {/* 자기 별점 */}
-                                <div className="bg-yellow-50 border-4 border-yellow-300 rounded-3xl p-5">
-                                    <p className="text-3xl font-bold text-yellow-800 text-center mb-3">⭐ 내 녹음, 어떤 것 같아요?</p>
-                                    <div className="flex gap-3 justify-center">
-                                        {[1, 2, 3, 4, 5].map(n => (
-                                            <button key={n} onClick={() => handleSelfStar(n)}
-                                                className="star-btn">
-                                                <Icon name="Star" size={60}
-                                                    className={selfStars >= n ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300 fill-gray-100'} />
-                                            </button>
-                                        ))}
+                                {/* 별점은 showSelfRating=true일 때만 (사후 녹음 전용) */}
+                                {showSelfRating && (
+                                    <>
+                                        <div className="bg-yellow-50 border-4 border-yellow-300 rounded-3xl p-5">
+                                            <p className="text-3xl font-bold text-yellow-800 text-center mb-3">⭐ 내 녹음, 어떤 것 같아요?</p>
+                                            <div className="flex gap-3 justify-center">
+                                                {[1, 2, 3, 4, 5].map(n => (
+                                                    <button key={n} onClick={() => handleSelfStar(n)}
+                                                        className="star-btn">
+                                                        <Icon name="Star" size={60}
+                                                            className={selfStars >= n ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300 fill-gray-100'} />
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* 별점 결과에 따른 안내 */}
+                                        {selfStars > 0 && selfStars <= 3 && (
+                                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                                                className="bg-orange-50 border-4 border-orange-300 rounded-3xl p-5 text-center">
+                                                <p className="text-3xl font-bold text-orange-700 mb-3">💪 한 번 더 도전해볼래요?</p>
+                                                <p className="text-2xl text-orange-600 mb-4">더 잘 할 수 있어요!</p>
+                                                <div className="flex gap-3 justify-center">
+                                                    <button onClick={retryRecord}
+                                                        className="bg-orange-500 text-white px-8 py-4 rounded-full text-2xl font-bold hover:bg-orange-600 active:scale-95">
+                                                        🔄 다시 녹음할래요!
+                                                    </button>
+                                                    <button onClick={() => showSticker ? setPhase('sticker') : finalSubmit()}
+                                                        className="bg-gray-300 text-gray-700 px-8 py-4 rounded-full text-2xl font-bold hover:bg-gray-400 active:scale-95">
+                                                        {showSticker ? '그대로 진행할래요' : '다음으로 →'}
+                                                    </button>
+                                                </div>
+                                            </motion.div>
+                                        )}
+
+                                        {selfStars >= 4 && (
+                                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                                                className="bg-green-50 border-4 border-green-300 rounded-3xl p-5 text-center">
+                                                <p className="text-3xl font-bold text-green-700 mb-3">🌟 정말 잘했어요!</p>
+                                                <div className="flex gap-3 justify-center flex-wrap">
+                                                    <button onClick={retryRecord}
+                                                        className="bg-blue-400 text-white px-8 py-4 rounded-full text-2xl font-bold hover:bg-blue-500 active:scale-95">
+                                                        🔄 그래도 다시 녹음할래요
+                                                    </button>
+                                                    <button onClick={() => showSticker ? setPhase('sticker') : finalSubmit()}
+                                                        className="bg-green-500 text-white px-8 py-4 rounded-full text-2xl font-bold hover:bg-green-600 active:scale-95">
+                                                        {showSticker ? '✨ 칭찬 스티커 받기!' : '다음으로 →'}
+                                                    </button>
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </>
+                                )}
+
+                                {/* 별점 없는 경우 (사전·중간 녹음): 바로 다음 버튼 */}
+                                {!showSelfRating && (audioBlob || text) && (
+                                    <div className="flex gap-3 flex-wrap">
+                                        <button onClick={retryRecord}
+                                            className="flex-1 min-w-[200px] bg-blue-400 text-white px-6 py-4 rounded-full text-2xl font-bold hover:bg-blue-500 active:scale-95">
+                                            🔄 다시 녹음할래요
+                                        </button>
+                                        <button onClick={() => onComplete({ text: textRef.current, base64: audioBase64, selfStars: 0, helpCount, sticker: null })}
+                                            className="flex-1 min-w-[200px] bg-green-500 text-white px-6 py-4 rounded-full text-2xl font-bold hover:bg-green-600 active:scale-95">
+                                            다음으로 →
+                                        </button>
                                     </div>
-                                </div>
-
-                                {/* 별점 결과에 따른 안내 */}
-                                {selfStars > 0 && selfStars <= 3 && (
-                                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                                        className="bg-orange-50 border-4 border-orange-300 rounded-3xl p-5 text-center">
-                                        <p className="text-3xl font-bold text-orange-700 mb-3">💪 한 번 더 도전해볼래요?</p>
-                                        <p className="text-2xl text-orange-600 mb-4">더 잘 할 수 있어요!</p>
-                                        <div className="flex gap-3 justify-center">
-                                            <button onClick={retryRecord}
-                                                className="bg-orange-500 text-white px-8 py-4 rounded-full text-2xl font-bold hover:bg-orange-600 active:scale-95">
-                                                🔄 다시 녹음할래요!
-                                            </button>
-                                            <button onClick={() => setPhase('sticker')}
-                                                className="bg-gray-300 text-gray-700 px-8 py-4 rounded-full text-2xl font-bold hover:bg-gray-400 active:scale-95">
-                                                그대로 진행할래요
-                                            </button>
-                                        </div>
-                                    </motion.div>
                                 )}
 
-                                {selfStars >= 4 && (
-                                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                                        className="bg-green-50 border-4 border-green-300 rounded-3xl p-5 text-center">
-                                        <p className="text-3xl font-bold text-green-700 mb-3">🌟 정말 잘했어요!</p>
-                                        <div className="flex gap-3 justify-center flex-wrap">
-                                            <button onClick={retryRecord}
-                                                className="bg-blue-400 text-white px-8 py-4 rounded-full text-2xl font-bold hover:bg-blue-500 active:scale-95">
-                                                🔄 그래도 다시 녹음할래요
-                                            </button>
-                                            <button onClick={() => setPhase('sticker')}
-                                                className="bg-green-500 text-white px-8 py-4 rounded-full text-2xl font-bold hover:bg-green-600 active:scale-95">
-                                                ✨ 칭찬 스티커 받기!
-                                            </button>
-                                        </div>
-                                    </motion.div>
-                                )}
-
-                                {/* 키보드만 사용한 경우의 다음 버튼 */}
-                                {selfStars === 0 && text && !audioBlob && (
-                                    <button onClick={() => setPhase('sticker')}
+                                {/* 키보드만 사용한 경우 (별점 표시 안 함) */}
+                                {showSelfRating && selfStars === 0 && text && !audioBlob && (
+                                    <button onClick={() => showSticker ? setPhase('sticker') : finalSubmit()}
                                         className="w-full bg-green-500 text-white py-5 rounded-full text-3xl font-bold hover:bg-green-600 active:scale-95">
                                         다음으로 →
                                     </button>
                                 )}
 
-                                {!text && !audioBlob && selfStars === 0 && (
+                                {!text && !audioBlob && (
                                     <button onClick={() => onComplete({ text: "", base64: null, selfStars: 0, helpCount, sticker: null })}
                                         className="w-full bg-gray-300 text-gray-700 py-5 rounded-full text-2xl font-bold hover:bg-gray-400 active:scale-95">
                                         건너뛰기
@@ -1356,10 +1595,10 @@
                     </button>
                 );
 
-                // 튜토리얼에서 녹화 시작 시도 후 무조건 닫기
+                // 튜토리얼에서 녹화 시작 시도 — 권한창이 뜨는 동안 튜토리얼은 닫음
                 const handleStartRecording = async () => {
+                    setShowTutorial(false);  // 먼저 튜토리얼 닫기 (권한창에 집중)
                     await startScreenRecording();
-                    setShowTutorial(false);
                 };
 
                 const handleSkipRecording = () => {
@@ -1636,27 +1875,36 @@
                         triggerCelebration('normal');
                         speak(`정답이에요! ${current.hint}`);
                         setFeedback({ correct: true, message: '정답이에요! 🎉' });
+                        // 정답일 때만 다음 문제로
+                        setTimeout(() => {
+                            const newResults = [...results, { id: current.id, correct: true, helpUsed: helpThis }];
+                            setResults(newResults);
+                            if (idx + 1 < TRICKY_QUIZZES.length) {
+                                setIdx(idx + 1);
+                                setShowHint(false);
+                                setHelpThis(false);
+                                setFeedback(null);
+                            } else {
+                                onComplete(newResults);
+                            }
+                        }, 2500);
                     } else {
                         playEffect('wrong');
                         speak('아쉬워요! 힌트를 보고 다시 생각해봐요.');
-                        setFeedback({ correct: false, message: `아쉬워요! 정답은 "${current.answer}" 예요.` });
-                    }
-                    setTimeout(() => {
-                        const newResults = [...results, { id: current.id, correct, helpUsed: helpThis }];
-                        setResults(newResults);
-                        if (idx + 1 < TRICKY_QUIZZES.length) {
-                            setIdx(idx + 1);
-                            setShowHint(false);
-                            setHelpThis(false);
+                        setFeedback({ correct: false, message: '아쉬워요! 다시 골라봐요.' });
+                        // 틀린 경우: 힌트 자동 표시 + 다시 풀기 (idx 유지)
+                        setTimeout(() => {
                             setFeedback(null);
-                        } else {
-                            onComplete(newResults);
-                        }
-                    }, 2200);
+                            setShowHint(true);
+                            setHelpThis(true);
+                            // 도움받음으로 카운트 (틀려서 힌트 자동표시)
+                            if (!helpThis) onHelpUsed();
+                        }, 2000);
+                    }
                 };
 
                 return (
-                    <div className="bg-white p-8 rounded-[3rem] shadow-2xl w-full max-w-5xl flex flex-col gap-5 border-8 border-orange-300">
+                    <div className="bg-white p-8 rounded-[3rem] shadow-2xl w-full max-w-5xl flex flex-col gap-5 border-8 border-orange-300 relative">
 
                         <div className="text-center">
                             <h2 className="text-5xl font-black text-orange-800 mb-2">🤔 헷갈리는 분리수거 퀴즈!</h2>
@@ -1667,7 +1915,9 @@
 
                         {/* 문제 */}
                         <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border-4 border-orange-300 rounded-3xl p-8 text-center">
-                            <div className="text-[7rem] leading-none mb-3">{current.icon}</div>
+                            <div className="flex justify-center mb-3">
+                                <TrashSVG type={current.svgType} size={140} />
+                            </div>
                             <p className="text-4xl font-bold text-slate-800 break-keep leading-tight">{current.question}</p>
                         </div>
 
@@ -1704,15 +1954,23 @@
                             </div>
                         </div>
 
-                        {/* 피드백 */}
+                        {/* 피드백 (큰 글씨 + 자연 줄바꿈) */}
                         <AnimatePresence>
                             {feedback && (
                                 <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
                                     className="absolute inset-0 bg-black/60 z-50 flex items-center justify-center rounded-[3rem] p-8">
-                                    <div className={`bg-white px-12 py-10 rounded-[3rem] border-8 ${feedback.correct ? 'border-green-400' : 'border-orange-400'} max-w-3xl text-center shadow-2xl flex flex-col gap-4`}>
-                                        <div className="text-[7rem] leading-none">{feedback.correct ? '🎉' : '🤔'}</div>
-                                        <h3 className={`text-5xl font-black ${feedback.correct ? 'text-green-600' : 'text-orange-500'}`}>{feedback.message}</h3>
-                                        <p className="text-2xl font-bold text-slate-700 leading-relaxed break-keep">{current.hint}</p>
+                                    <div className={`bg-white px-12 py-10 rounded-[3rem] border-8 ${feedback.correct ? 'border-green-400' : 'border-orange-400'} max-w-4xl text-center shadow-2xl flex flex-col gap-5`}>
+                                        <div className="text-[8rem] leading-none">{feedback.correct ? '🎉' : '🤔'}</div>
+                                        <h3 className={`text-6xl font-black ${feedback.correct ? 'text-green-600' : 'text-orange-500'} leading-tight`}>{feedback.message}</h3>
+                                        {feedback.correct ? (
+                                            <p className="text-3xl font-bold text-slate-700 leading-relaxed break-keep">
+                                                {current.hint}
+                                            </p>
+                                        ) : (
+                                            <p className="text-3xl font-bold text-slate-600 leading-relaxed break-keep">
+                                                힌트를 보고<br />한 번 더 생각해봐요!
+                                            </p>
+                                        )}
                                     </div>
                                 </motion.div>
                             )}
@@ -1787,6 +2045,12 @@
                         </button>
                     </div>
                 );
+            };
+
+            // 쓰레기 표시 헬퍼: svgType이 있으면 SVG, 없으면 이모지
+            const TrashDisplay = ({ trash, size = 100 }) => {
+                if (trash.svgType) return <TrashSVG type={trash.svgType} size={size} />;
+                return <span style={{ fontSize: `${size * 0.85}px`, lineHeight: 1 }}>{trash.icon}</span>;
             };
 
             // ============================================================
@@ -1939,7 +2203,9 @@
                                                 initial={{ scale: 0 }} animate={{ scale: 1, y: [0, -10, 0] }}
                                                 transition={{ y: { repeat: Infinity, duration: 2, delay: Math.random() } }}
                                             >
-                                                <div className="text-[8rem] mb-2 leading-none">{t.icon}</div>
+                                                <div className="mb-2 bg-white/80 rounded-3xl p-3 shadow-xl">
+                                                    <TrashDisplay trash={t} size={120} />
+                                                </div>
                                                 <div className="bg-white/95 px-6 py-2 rounded-2xl text-2xl font-bold text-gray-800 border-4 border-blue-200">
                                                     {t.name}
                                                 </div>
@@ -1964,12 +2230,12 @@
                                                     initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                                                     <motion.div className="bg-white p-12 rounded-[4rem] shadow-2xl max-w-4xl w-full text-center flex flex-col items-center gap-6 border-8 border-blue-400"
                                                         initial={{ scale: 0.8, y: 50 }} animate={{ scale: 1, y: 0 }}>
-                                                        <div className="text-[10rem] bg-blue-50 w-64 h-64 rounded-full flex items-center justify-center border-8 border-blue-200">
-                                                            {popupTrash.icon}
+                                                        <div className="bg-blue-50 w-64 h-64 rounded-full flex items-center justify-center border-8 border-blue-200">
+                                                            <TrashDisplay trash={popupTrash} size={180} />
                                                         </div>
                                                         <h3 className="text-5xl font-bold text-blue-900">{popupTrash.name}</h3>
                                                         <div className="bg-green-100 text-green-800 px-6 py-2 rounded-full text-2xl font-bold border-4 border-green-300">
-                                                            🌟 이것은 재활용할 수 있는 쓰레기예요!
+                                                            🌟 이건 어떻게 분류할까요?
                                                         </div>
                                                         <p className="text-4xl font-bold text-gray-700 leading-relaxed bg-gray-50 p-8 rounded-3xl w-full text-center whitespace-pre-line break-keep">
                                                             {popupTrash.fact}
@@ -1997,12 +2263,13 @@
                                             <p className="text-3xl font-bold text-emerald-700 bg-white px-8 py-3 rounded-full shadow-sm border-4 border-emerald-200">
                                                 👆 쓰레기를 누르고, 알맞은 쓰레기통을 골라주세요!
                                             </p>
-                                            <div className="flex gap-3 flex-wrap justify-center">
-                                                <span className="text-xl font-bold text-slate-700 bg-blue-100 px-4 py-2 rounded-full border-2 border-blue-300">📦 종이류</span>
-                                                <span className="text-xl font-bold text-slate-700 bg-yellow-100 px-4 py-2 rounded-full border-2 border-yellow-300">🥤 플라스틱류</span>
-                                                <span className="text-xl font-bold text-slate-700 bg-red-100 px-4 py-2 rounded-full border-2 border-red-300">🫙 병류</span>
-                                                <span className="text-xl font-bold text-slate-700 bg-gray-100 px-4 py-2 rounded-full border-2 border-gray-300">🥫 캔류</span>
-                                                <span className="text-xl font-bold text-slate-700 bg-slate-100 px-4 py-2 rounded-full border-2 border-slate-300">🛍️ 비닐류</span>
+                                            <div className="flex gap-2 flex-wrap justify-center">
+                                                <span className="text-lg font-bold text-slate-700 bg-blue-100 px-3 py-2 rounded-full border-2 border-blue-300">📦 종이류</span>
+                                                <span className="text-lg font-bold text-slate-700 bg-yellow-100 px-3 py-2 rounded-full border-2 border-yellow-300">🥤 플라스틱류</span>
+                                                <span className="text-lg font-bold text-slate-700 bg-red-100 px-3 py-2 rounded-full border-2 border-red-300">🫙 병류</span>
+                                                <span className="text-lg font-bold text-slate-700 bg-gray-100 px-3 py-2 rounded-full border-2 border-gray-300">🥫 캔류</span>
+                                                <span className="text-lg font-bold text-slate-700 bg-slate-100 px-3 py-2 rounded-full border-2 border-slate-300">🛍️ 비닐류</span>
+                                                <span className="text-lg font-bold text-slate-700 bg-stone-100 px-3 py-2 rounded-full border-2 border-stone-300">🗑️ 일반쓰레기</span>
                                             </div>
                                         </div>
 
@@ -2014,8 +2281,8 @@
                                                         onClick={() => setSelectedTrashForSort(t)}
                                                         className="bg-gray-50 rounded-3xl w-44 flex flex-col items-center justify-center shadow-md border-4 border-gray-200 hover:scale-105 active:scale-95 p-3"
                                                     >
-                                                        <div className="text-[6rem] leading-none">{t.icon}</div>
-                                                        <div className="text-2xl font-bold text-gray-700 mt-2">{t.name}</div>
+                                                        <TrashDisplay trash={t} size={100} />
+                                                        <div className="text-xl font-bold text-gray-700 mt-2 text-center break-keep">{t.name}</div>
                                                     </button>
                                                 ))}
                                                 {collectedTrash.length === 0 && (
@@ -2026,12 +2293,12 @@
                                                 )}
                                             </div>
 
-                                            <div className="flex-1 grid grid-cols-3 gap-6 content-center">
+                                            <div className="flex-1 grid grid-cols-3 gap-5 content-center">
                                                 {BIN_TYPES.map(bin => (
-                                                    <div key={bin.id} className={`rounded-[3rem] border-8 p-6 flex flex-col items-center justify-center ${bin.color} opacity-90 shadow-sm`}>
-                                                        <div className="text-[5rem] leading-none mb-4">{bin.icon}</div>
-                                                        <div className="text-3xl font-bold">{bin.name}</div>
-                                                        <div className="text-2xl mt-3 font-bold opacity-70 bg-white/50 px-4 py-1 rounded-full">
+                                                    <div key={bin.id} className={`rounded-[2.5rem] border-8 p-5 flex flex-col items-center justify-center ${bin.color} opacity-90 shadow-sm`}>
+                                                        <div className="text-[4.5rem] leading-none mb-2">{bin.icon}</div>
+                                                        <div className="text-2xl font-bold">{bin.name}</div>
+                                                        <div className="text-xl mt-2 font-bold opacity-70 bg-white/50 px-3 py-1 rounded-full">
                                                             {sortedTrash.filter(t => t.type === bin.id).length}개
                                                         </div>
                                                     </div>
@@ -2044,20 +2311,22 @@
                                                 <div className="bg-white p-12 rounded-[4rem] shadow-2xl flex flex-col items-center border-8 border-emerald-300 w-full max-w-5xl" onClick={e => e.stopPropagation()}>
                                                     <h3 className="text-5xl font-bold text-gray-800 mb-6 text-center break-keep">어디에 분리수거 할까요?</h3>
                                                     <div className="flex flex-col items-center mb-8 bg-gray-50 px-16 py-6 rounded-[3rem] border-4 border-gray-200 w-full">
-                                                        <div className="text-[8rem] leading-none drop-shadow-xl animate-bounce">{selectedTrashForSort.icon}</div>
+                                                        <div className="drop-shadow-xl animate-bounce">
+                                                            <TrashDisplay trash={selectedTrashForSort} size={140} />
+                                                        </div>
                                                         <div className="text-3xl font-bold text-gray-700 bg-white px-8 py-2 rounded-full border-4 border-gray-300 mt-3">
                                                             {selectedTrashForSort.name}
                                                         </div>
                                                     </div>
-                                                    <div className="grid grid-cols-5 gap-3 w-full">
+                                                    <div className="grid grid-cols-3 gap-4 w-full">
                                                         {BIN_TYPES.map(bin => (
                                                             <button
                                                                 key={bin.id}
                                                                 onClick={() => handleSort(selectedTrashForSort, bin.id)}
                                                                 className={`p-5 rounded-3xl border-4 flex flex-col items-center justify-center ${bin.color} active:scale-90 shadow-md`}
                                                             >
-                                                                <span className="text-[4rem] mb-2 leading-none">{bin.icon}</span>
-                                                                <span className="text-xl font-bold whitespace-nowrap">{bin.name}</span>
+                                                                <span className="text-[4.5rem] mb-2 leading-none">{bin.icon}</span>
+                                                                <span className="text-2xl font-bold whitespace-nowrap">{bin.name}</span>
                                                             </button>
                                                         ))}
                                                     </div>
@@ -2272,6 +2541,8 @@
                                                         <RecorderComponent
                                                             defaultText="나만의 작품 이름을 지어 말해보세요!"
                                                             helpKey="artwork"
+                                                            showSelfRating={false}
+                                                            showSticker={false}
                                                             exampleList={[
                                                                 "저는 페트병으로 멋진 화분을 만들 거예요!",
                                                                 "캔과 종이로 로봇을 만들 거예요!",
