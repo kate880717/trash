@@ -1,1 +1,2778 @@
+<!DOCTYPE html>
+<html lang="ko">
 
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>분리수거 대장</title>
+
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Framer Motion -->
+    <script src="https://unpkg.com/framer-motion@10.16.4/dist/framer-motion.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- html2canvas -->
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Jua&family=Nanum+Gothic:wght@700;800&display=swap');
+
+        html {
+            font-size: 16px;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Nanum Gothic', 'Jua', sans-serif;
+            font-weight: 800;
+            background-color: #111827;
+            touch-action: none;
+            user-select: none;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* 제목·큰 글씨는 Jua */
+        h1, h2, h3, .font-display {
+            font-family: 'Jua', 'Nanum Gothic', sans-serif;
+        }
+
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(12px);
+            border: 4px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .star-btn {
+            transition: all 0.2s;
+        }
+
+        .star-btn:hover {
+            transform: scale(1.2);
+        }
+
+        .ripple {
+            animation: ripple 1.5s infinite linear;
+        }
+
+        @keyframes ripple {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+            70% { box-shadow: 0 0 0 30px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        @keyframes float-up {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-300px) scale(2); opacity: 0; }
+        }
+
+        .sticker-pop {
+            animation: float-up 2s ease-out forwards;
+        }
+
+        @keyframes wiggle {
+            0%, 100% { transform: rotate(-3deg); }
+            50% { transform: rotate(3deg); }
+        }
+
+        .wiggle {
+            animation: wiggle 1s ease-in-out infinite;
+        }
+
+        /* TTS 하이라이트용 */
+        .tts-highlight {
+            background: linear-gradient(120deg, #fef08a 0%, #fde047 100%);
+            border-radius: 0.3em;
+            padding: 0 0.2em;
+            transition: all 0.2s;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback } = React;
+        const { motion, AnimatePresence } = window.Motion;
+
+        // ============================================================
+        // 음성(TTS) 시스템 - Google Wavenet/Neural 우선
+        // ============================================================
+        let cachedVoice = null;
+        let voicesLoaded = false;
+
+        const loadKoreanVoice = () => {
+            return new Promise((resolve) => {
+                const trySelect = () => {
+                    const voices = window.speechSynthesis.getVoices();
+                    if (!voices || voices.length === 0) return null;
+
+                    // 1순위: Google 한국어 클라우드 음성
+                    const googleKo = voices.find(v =>
+                        v.lang === 'ko-KR' &&
+                        v.name.toLowerCase().includes('google') &&
+                        !v.localService
+                    );
+                    if (googleKo) return googleKo;
+
+                    // 2순위: Wavenet/Neural2 명시적 이름
+                    const wavenet = voices.find(v =>
+                        v.lang === 'ko-KR' &&
+                        /wavenet|neural|premium|enhanced|natural/i.test(v.name)
+                    );
+                    if (wavenet) return wavenet;
+
+                    // 3순위: 일반 Google 한국어 (로컬이라도)
+                    const anyGoogle = voices.find(v =>
+                        v.lang === 'ko-KR' &&
+                        v.name.toLowerCase().includes('google')
+                    );
+                    if (anyGoogle) return anyGoogle;
+
+                    // 4순위: 아무 한국어 음성
+                    const anyKo = voices.find(v => v.lang === 'ko-KR' || v.lang.startsWith('ko'));
+                    return anyKo || null;
+                };
+
+                const v = trySelect();
+                if (v) { cachedVoice = v; voicesLoaded = true; resolve(v); return; }
+
+                // 음성 로드 대기
+                window.speechSynthesis.onvoiceschanged = () => {
+                    const found = trySelect();
+                    if (found && !voicesLoaded) {
+                        cachedVoice = found;
+                        voicesLoaded = true;
+                        resolve(found);
+                    }
+                };
+                // 안전 타임아웃
+                setTimeout(() => resolve(trySelect()), 1500);
+            });
+        };
+
+        const Icon = ({ name, size = 24, className = "" }) => {
+            const iconRef = useRef(null);
+            useEffect(() => {
+                if (iconRef.current && window.lucide.icons[name]) {
+                    iconRef.current.innerHTML = "";
+                    const iconNode = window.lucide.icons[name];
+                    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                    svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+                    svg.setAttribute("width", size);
+                    svg.setAttribute("height", size);
+                    svg.setAttribute("viewBox", "0 0 24 24");
+                    svg.setAttribute("fill", "none");
+                    svg.setAttribute("stroke", "currentColor");
+                    svg.setAttribute("stroke-width", "2.5");
+                    svg.setAttribute("stroke-linecap", "round");
+                    svg.setAttribute("stroke-linejoin", "round");
+                    if (className) svg.setAttribute("class", className);
+
+                    if (Array.isArray(iconNode)) {
+                        let children = iconNode;
+                        if (iconNode.length === 3 && iconNode[0] === 'svg') {
+                            Object.entries(iconNode[1]).forEach(([k, v]) => {
+                                if (k !== 'class') svg.setAttribute(k, v);
+                            });
+                            children = iconNode[2];
+                        }
+                        children.forEach(([tag, attrs]) => {
+                            const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+                            Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
+                            svg.appendChild(el);
+                        });
+                    }
+                    iconRef.current.appendChild(svg);
+                }
+            }, [name, size, className]);
+            return <div ref={iconRef} className="inline-flex" />;
+        };
+
+        // ============================================================
+        // 직접 그린 SVG 아이콘들 (이모지로 표현 안 되는 것들)
+        // ============================================================
+        const TrashSVG = ({ type, size = 100 }) => {
+            const s = size;
+            switch (type) {
+                case 'paper-cup': // 종이컵 (커피숍 테이크아웃 컵)
+                    return (
+                        <svg width={s} height={s} viewBox="0 0 100 100">
+                            {/* 컵 뚜껑 */}
+                            <ellipse cx="50" cy="22" rx="32" ry="6" fill="#8B5E3C" />
+                            <rect x="18" y="22" width="64" height="6" fill="#A0714E" />
+                            {/* 빨대 */}
+                            <rect x="56" y="6" width="6" height="22" rx="2" fill="#E74C3C" />
+                            <rect x="56" y="6" width="3" height="22" rx="1" fill="#FFFFFF" opacity="0.4" />
+                            {/* 컵 본체 (사다리꼴) */}
+                            <path d="M 22 28 L 78 28 L 72 88 L 28 88 Z" fill="#FFFFFF" stroke="#333" strokeWidth="2" />
+                            {/* 컵 띠지 (종이컵 표시) */}
+                            <path d="M 24 42 L 76 42 L 74 56 L 26 56 Z" fill="#C9A87C" />
+                            <text x="50" y="53" fontSize="9" fontWeight="bold" fill="#5C3A1A" textAnchor="middle">COFFEE</text>
+                            {/* 컵 바닥 */}
+                            <ellipse cx="50" cy="88" rx="22" ry="3" fill="#E8E8E8" />
+                        </svg>
+                    );
+                case 'pet-bottle': // 페트병 (음료수)
+                    return (
+                        <svg width={s} height={s} viewBox="0 0 100 100">
+                            {/* 뚜껑 */}
+                            <rect x="40" y="6" width="20" height="10" rx="2" fill="#2196F3" />
+                            <rect x="40" y="6" width="20" height="3" fill="#1976D2" />
+                            {/* 병 목 */}
+                            <rect x="42" y="16" width="16" height="10" fill="#E3F2FD" stroke="#90CAF9" strokeWidth="1.5" />
+                            {/* 병 어깨 */}
+                            <path d="M 42 26 L 42 32 Q 28 36 28 46 L 28 82 Q 28 90 38 90 L 62 90 Q 72 90 72 82 L 72 46 Q 72 36 58 32 L 58 26 Z"
+                                fill="#E3F2FD" stroke="#1976D2" strokeWidth="2" />
+                            {/* 라벨 */}
+                            <rect x="30" y="50" width="40" height="22" fill="#FFEB3B" stroke="#F57F17" strokeWidth="1.5" />
+                            <text x="50" y="64" fontSize="9" fontWeight="bold" fill="#E65100" textAnchor="middle">JUICE</text>
+                            {/* 물 반짝임 */}
+                            <ellipse cx="36" cy="50" rx="3" ry="10" fill="#FFFFFF" opacity="0.6" />
+                        </svg>
+                    );
+                case 'milk-carton': // 우유팩 (테트라팩)
+                    return (
+                        <svg width={s} height={s} viewBox="0 0 100 100">
+                            {/* 윗부분 (지붕 모양) */}
+                            <path d="M 22 24 L 50 8 L 78 24 L 78 30 L 22 30 Z"
+                                fill="#FFFFFF" stroke="#333" strokeWidth="2" />
+                            <line x1="50" y1="8" x2="50" y2="30" stroke="#333" strokeWidth="2" />
+                            {/* 본체 */}
+                            <rect x="22" y="30" width="56" height="60" fill="#FFFFFF" stroke="#333" strokeWidth="2" />
+                            {/* 우유 그림 (소) */}
+                            <circle cx="50" cy="50" r="11" fill="#FFE0B2" />
+                            <ellipse cx="46" cy="48" rx="2" ry="3" fill="#333" />
+                            <ellipse cx="54" cy="48" rx="2" ry="3" fill="#333" />
+                            <path d="M 44 54 Q 50 58 56 54" stroke="#333" strokeWidth="1.5" fill="none" />
+                            {/* MILK 글자 */}
+                            <rect x="28" y="68" width="44" height="14" fill="#1976D2" />
+                            <text x="50" y="79" fontSize="11" fontWeight="bold" fill="#FFFFFF" textAnchor="middle">MILK</text>
+                        </svg>
+                    );
+                case 'receipt': // 영수증
+                    return (
+                        <svg width={s} height={s} viewBox="0 0 100 100">
+                            {/* 영수증 종이 (긴 직사각형, 끝이 톱니) */}
+                            <path d="M 30 6 L 70 6 L 70 84 L 65 90 L 60 84 L 55 90 L 50 84 L 45 90 L 40 84 L 35 90 L 30 84 Z"
+                                fill="#FAFAFA" stroke="#999" strokeWidth="1.5" />
+                            {/* 가게 이름 */}
+                            <text x="50" y="18" fontSize="7" fontWeight="bold" fill="#333" textAnchor="middle">★ MART ★</text>
+                            {/* 줄들 */}
+                            <line x1="35" y1="26" x2="65" y2="26" stroke="#BBB" strokeWidth="1" strokeDasharray="2 1" />
+                            <text x="35" y="36" fontSize="6" fill="#666">우유</text>
+                            <text x="65" y="36" fontSize="6" fill="#666" textAnchor="end">1,500</text>
+                            <text x="35" y="46" fontSize="6" fill="#666">빵</text>
+                            <text x="65" y="46" fontSize="6" fill="#666" textAnchor="end">2,000</text>
+                            <text x="35" y="56" fontSize="6" fill="#666">사과</text>
+                            <text x="65" y="56" fontSize="6" fill="#666" textAnchor="end">3,500</text>
+                            <line x1="35" y1="62" x2="65" y2="62" stroke="#BBB" strokeWidth="1" strokeDasharray="2 1" />
+                            <text x="35" y="74" fontSize="7" fontWeight="bold" fill="#333">합계</text>
+                            <text x="65" y="74" fontSize="7" fontWeight="bold" fill="#333" textAnchor="end">7,000</text>
+                        </svg>
+                    );
+                case 'tissue': // 사용한 휴지
+                    return (
+                        <svg width={s} height={s} viewBox="0 0 100 100">
+                            {/* 구겨진 휴지 (곡선들) */}
+                            <path d="M 20 55 Q 15 40 25 30 Q 35 22 50 25 Q 65 22 75 30 Q 85 40 80 55 Q 85 70 75 78 Q 60 85 50 80 Q 35 85 25 78 Q 15 70 20 55 Z"
+                                fill="#FFFFFF" stroke="#888" strokeWidth="2" />
+                            {/* 구김 선들 */}
+                            <path d="M 30 40 Q 38 48 35 58" stroke="#CCC" strokeWidth="1.5" fill="none" />
+                            <path d="M 60 35 Q 55 45 62 55" stroke="#CCC" strokeWidth="1.5" fill="none" />
+                            <path d="M 45 50 Q 50 60 45 70" stroke="#CCC" strokeWidth="1.5" fill="none" />
+                            <path d="M 70 50 Q 75 60 70 70" stroke="#CCC" strokeWidth="1.5" fill="none" />
+                            {/* 사용 흔적 (옅은 노란 얼룩) */}
+                            <ellipse cx="55" cy="55" rx="8" ry="6" fill="#FFF59D" opacity="0.5" />
+                        </svg>
+                    );
+                case 'plastic-bag': // 비닐봉투
+                    return (
+                        <svg width={s} height={s} viewBox="0 0 100 100">
+                            {/* 손잡이 */}
+                            <path d="M 30 18 Q 30 10 38 10 L 42 10 Q 50 10 50 18" stroke="#1976D2" strokeWidth="3" fill="none" />
+                            <path d="M 50 18 Q 50 10 58 10 L 62 10 Q 70 10 70 18" stroke="#1976D2" strokeWidth="3" fill="none" />
+                            {/* 봉투 본체 */}
+                            <path d="M 22 20 L 78 20 L 74 90 L 26 90 Z"
+                                fill="#64B5F6" stroke="#1565C0" strokeWidth="2" />
+                            {/* 줄무늬 */}
+                            <line x1="35" y1="30" x2="35" y2="85" stroke="#1976D2" strokeWidth="1.5" opacity="0.6" />
+                            <line x1="50" y1="30" x2="50" y2="85" stroke="#1976D2" strokeWidth="1.5" opacity="0.6" />
+                            <line x1="65" y1="30" x2="65" y2="85" stroke="#1976D2" strokeWidth="1.5" opacity="0.6" />
+                            {/* 마트 로고 */}
+                            <circle cx="50" cy="55" r="12" fill="#FFEB3B" />
+                            <text x="50" y="59" fontSize="8" fontWeight="bold" fill="#E65100" textAnchor="middle">MART</text>
+                        </svg>
+                    );
+                case 'plastic-cup': // 플라스틱 컵 (재활용 가능)
+                    return (
+                        <svg width={s} height={s} viewBox="0 0 100 100">
+                            {/* 컵 (투명한 사다리꼴) */}
+                            <path d="M 22 18 L 78 18 L 72 88 L 28 88 Z"
+                                fill="#E1F5FE" stroke="#0277BD" strokeWidth="2" opacity="0.85" />
+                            {/* 빨대 */}
+                            <rect x="48" y="4" width="6" height="22" rx="1" fill="#F44336" />
+                            {/* 음료 (반쯤) */}
+                            <path d="M 26 50 L 74 50 L 72 88 L 28 88 Z" fill="#FFC107" opacity="0.7" />
+                            {/* 반짝임 */}
+                            <ellipse cx="34" cy="40" rx="3" ry="12" fill="#FFFFFF" opacity="0.7" />
+                            {/* ♻️ 마크 */}
+                            <text x="50" y="78" fontSize="14" textAnchor="middle">♻</text>
+                        </svg>
+                    );
+                case 'paper-box': // 종이상자
+                    return (
+                        <svg width={s} height={s} viewBox="0 0 100 100">
+                            {/* 상자 윗면 */}
+                            <path d="M 18 28 L 50 16 L 82 28 L 50 40 Z"
+                                fill="#D7A86E" stroke="#8B4513" strokeWidth="2" />
+                            {/* 왼쪽 면 */}
+                            <path d="M 18 28 L 18 76 L 50 88 L 50 40 Z"
+                                fill="#C19A6B" stroke="#8B4513" strokeWidth="2" />
+                            {/* 오른쪽 면 */}
+                            <path d="M 82 28 L 82 76 L 50 88 L 50 40 Z"
+                                fill="#A67B5B" stroke="#8B4513" strokeWidth="2" />
+                            {/* 테이프 */}
+                            <path d="M 30 22 L 62 10 L 70 14 L 38 26 Z" fill="#FFEB3B" opacity="0.8" stroke="#F57F17" strokeWidth="1" />
+                        </svg>
+                    );
+                case 'glass-bottle': // 유리병
+                    return (
+                        <svg width={s} height={s} viewBox="0 0 100 100">
+                            {/* 뚜껑 */}
+                            <rect x="42" y="8" width="16" height="8" fill="#D32F2F" />
+                            {/* 병 목 */}
+                            <rect x="44" y="16" width="12" height="14" fill="#A5D6A7" stroke="#2E7D32" strokeWidth="1.5" />
+                            {/* 병 본체 */}
+                            <path d="M 44 30 Q 32 36 32 46 L 32 84 Q 32 90 38 90 L 62 90 Q 68 90 68 84 L 68 46 Q 68 36 56 30 Z"
+                                fill="#81C784" stroke="#2E7D32" strokeWidth="2" />
+                            {/* 라벨 */}
+                            <rect x="36" y="52" width="28" height="20" fill="#FFFFFF" stroke="#2E7D32" strokeWidth="1.5" />
+                            <text x="50" y="65" fontSize="8" fontWeight="bold" fill="#2E7D32" textAnchor="middle">JAM</text>
+                            {/* 반짝임 */}
+                            <ellipse cx="38" cy="50" rx="2" ry="10" fill="#FFFFFF" opacity="0.7" />
+                        </svg>
+                    );
+                case 'can': // 캔
+                    return (
+                        <svg width={s} height={s} viewBox="0 0 100 100">
+                            {/* 캔 윗면 */}
+                            <ellipse cx="50" cy="20" rx="22" ry="6" fill="#BDBDBD" stroke="#616161" strokeWidth="2" />
+                            {/* 캔 본체 */}
+                            <rect x="28" y="20" width="44" height="62" fill="#E0E0E0" stroke="#616161" strokeWidth="2" />
+                            {/* 라벨 */}
+                            <rect x="28" y="32" width="44" height="36" fill="#F44336" stroke="#B71C1C" strokeWidth="1.5" />
+                            <text x="50" y="50" fontSize="9" fontWeight="bold" fill="#FFFFFF" textAnchor="middle">참치</text>
+                            <text x="50" y="62" fontSize="7" fontWeight="bold" fill="#FFFFFF" textAnchor="middle">TUNA</text>
+                            {/* 캔 바닥 */}
+                            <ellipse cx="50" cy="82" rx="22" ry="4" fill="#9E9E9E" stroke="#616161" strokeWidth="1.5" />
+                            {/* 따개 고리 */}
+                            <ellipse cx="50" cy="20" rx="6" ry="2" fill="#9E9E9E" />
+                        </svg>
+                    );
+                default:
+                    return null;
+            }
+        };
+
+        const BIN_TYPES = [
+            { id: '플라스틱류', name: '플라스틱', icon: '🥤', color: 'bg-blue-100 text-blue-800 border-blue-400' },
+            { id: '종이류', name: '종이', icon: '📦', color: 'bg-yellow-100 text-yellow-800 border-yellow-400' },
+            { id: '병류', name: '유리병', icon: '🫙', color: 'bg-red-100 text-red-800 border-red-400' },
+            { id: '캔류', name: '캔/고철', icon: '🥫', color: 'bg-gray-200 text-gray-800 border-gray-500' },
+            { id: '비닐류', name: '비닐', icon: '🛍️', color: 'bg-slate-200 text-slate-800 border-slate-500' },
+            { id: '일반쓰레기', name: '일반쓰레기', icon: '🗑️', color: 'bg-stone-200 text-stone-800 border-stone-500' }
+        ];
+
+        // 분리수거 헷갈리는 퀴즈 (개념학습) - SVG 그림 사용
+        const TRICKY_QUIZZES = [
+            {
+                id: 'paper-cup',
+                svgType: 'paper-cup',
+                question: '커피숍에서 쓰는 종이컵은 어떻게 분류할까요?',
+                answer: '일반쓰레기',
+                hint: '종이컵은 안쪽에 비닐(코팅)이 발라져 있어서 일반 종이와 달라요. 그래서 일반쓰레기로 버려야 해요!'
+            },
+            {
+                id: 'tissue',
+                svgType: 'tissue',
+                question: '사용한 휴지(화장지)는 어떻게 분류할까요?',
+                answer: '일반쓰레기',
+                hint: '사용한 휴지는 물이나 음식이 묻어 있어서 재활용이 안 돼요. 일반쓰레기로 버려요!'
+            },
+            {
+                id: 'small-paper',
+                svgType: 'receipt',
+                question: '영수증은 어떻게 분류할까요?',
+                answer: '일반쓰레기',
+                hint: '영수증은 특수 코팅이 되어 있어서 재활용이 안 돼요. 일반쓰레기로 버려요!'
+            },
+            {
+                id: 'pet-bottle',
+                svgType: 'pet-bottle',
+                question: '음료수 페트병은 어떻게 분류할까요?',
+                answer: '플라스틱류',
+                hint: '페트병은 라벨을 떼고, 안을 깨끗이 씻고, 뚜껑을 빼서 플라스틱류에 버려요!'
+            },
+            {
+                id: 'milk-carton',
+                svgType: 'milk-carton',
+                question: '다 마신 우유팩은 어떻게 분류할까요?',
+                answer: '종이류',
+                hint: '우유팩은 깨끗이 씻어 말려서 종이류에 버려요. 일반 종이와 따로 모으면 더 좋아요!'
+            },
+            {
+                id: 'plastic-bag',
+                svgType: 'plastic-bag',
+                question: '마트에서 받은 비닐봉투는 어떻게 분류할까요?',
+                answer: '비닐류',
+                hint: '비닐은 비닐류에 따로 모아 버려요. 음식물이 묻었으면 깨끗이 씻어서 버려요!'
+            }
+        ];
+
+        const QUIZ_BINS_FOR_CHOICE = [
+            { id: '플라스틱류', name: '플라스틱', icon: '🥤' },
+            { id: '종이류', name: '종이', icon: '📦' },
+            { id: '병류', name: '유리병', icon: '🫙' },
+            { id: '캔류', name: '캔', icon: '🥫' },
+            { id: '비닐류', name: '비닐', icon: '🛍️' },
+            { id: '일반쓰레기', name: '일반쓰레기', icon: '🗑️' }
+        ];
+
+        // 쓰레기 이름 → SVG 타입 매핑 (구글시트 데이터에서 이름 기준 자동 매칭)
+        const NAME_TO_SVG = {
+            '플라스틱 컵': 'plastic-cup',
+            '종이상자': 'paper-box',
+            '유리병': 'glass-bottle',
+            '통조림 캔': 'can',
+            '비닐 봉투': 'plastic-bag',
+            '종이컵': 'paper-cup',
+            '사용한 휴지': 'tissue',
+            '영수증': 'receipt',
+            '페트병': 'pet-bottle',
+            '우유팩': 'milk-carton'
+        };
+
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbyVERNJF2Gcw7AA15cL6FU5mdi2RG1GGrW_4-6-KXyBHy7kLuhUQd8OX4QxxIQXMaT7/exec";
+
+        // ============================================================
+        // 칭찬 스티커 (폭죽 + 떠오르는 이모지)
+        // ============================================================
+        const triggerCelebration = (intensity = 'normal') => {
+            if (!window.confetti) return;
+            const opts = {
+                particleCount: intensity === 'big' ? 200 : 100,
+                spread: 90,
+                origin: { y: 0.6 },
+                colors: ['#fde047', '#f472b6', '#60a5fa', '#34d399', '#fb923c', '#a78bfa']
+            };
+            window.confetti(opts);
+            if (intensity === 'big') {
+                setTimeout(() => window.confetti({ ...opts, angle: 60, origin: { x: 0, y: 0.7 } }), 200);
+                setTimeout(() => window.confetti({ ...opts, angle: 120, origin: { x: 1, y: 0.7 } }), 400);
+            }
+        };
+
+        const App = () => {
+            const [speakerEnabled, setSpeakerEnabled] = useState(false);
+            const [isSaving, setIsSaving] = useState(false);
+            const [micPermissionGranted, setMicPermissionGranted] = useState(false);
+            const [showMicGate, setShowMicGate] = useState(true);
+
+            const [students, setStudents] = useState([]);
+            const [problems, setProblems] = useState([]);
+            const [exampleSentences, setExampleSentences] = useState([
+                "분리수거는 종이, 플라스틱, 캔, 병, 비닐을 나누어 버리는 것이에요.",
+                "분리수거를 하면 쓰레기가 줄어들고, 새 물건을 만들 수 있어요.",
+                "플라스틱 병은 깨끗이 씻어서 뚜껑을 빼고 버려요.",
+                "종이는 테이프를 떼고 납작하게 접어서 버려요.",
+                "오늘 활동을 통해 분리수거가 정말 중요하다는 것을 배웠어요."
+            ]);
+            const [isLoading, setIsLoading] = useState(true);
+
+            // 진행 상태
+            const [studentName, setStudentName] = useState("");
+            const [step, setStep] = useState(0);
+            const [preRecordData, setPreRecordData] = useState(null);
+            const [postRecordData, setPostRecordData] = useState(null);
+            const [artworkNameData, setArtworkNameData] = useState(null);
+            const [actualArtworkData, setActualArtworkData] = useState(null);
+            const [blueprintData, setBlueprintData] = useState(null);
+            const [blueprintScreenRec, setBlueprintScreenRec] = useState(null); // 화면 녹화 base64
+            const [stars, setStars] = useState(0);
+
+            // 도움 기록
+            const [helpUsedCount, setHelpUsedCount] = useState({ pre: 0, post: 0, artwork: 0, quiz: 0 });
+
+            // 헷갈리는 분리수거 퀴즈
+            const [quizResults, setQuizResults] = useState([]); // [{id, correct, helpUsed}]
+
+            // 설계도 영상 자기평가
+            const [blueprintSelfStars, setBlueprintSelfStars] = useState(0);
+
+            // 매칭 게임
+            const MATCHING_PAIRS = [
+                { id: 'bottle', trashIcon: '🥤', trashName: '플라스틱병', upcycleIcon: '👜', upcycleName: '에코백', message: '페트병을 모아서 녹이면\n멋진 에코백이 된답니다!' },
+                { id: 'can', trashIcon: '🥫', trashName: '캔/고철', upcycleIcon: '🚲', upcycleName: '자전거', message: '캔을 분리수거하면\n튼튼한 자전거로 다시 태어나요!' },
+                { id: 'carton', trashIcon: '📦', trashName: '종이박스', upcycleIcon: '🧻', upcycleName: '두루마리 휴지', message: '종이를 깨끗이 모으면\n부드러운 휴지가 된답니다!' }
+            ];
+            const [selectedMatchingTrash, setSelectedMatchingTrash] = useState(null);
+            const [matchedPairs, setMatchedPairs] = useState([]);
+            const [matchingPopup, setMatchingPopup] = useState(null);
+            const [matchingWrongPopup, setMatchingWrongPopup] = useState(false);
+
+            // 미니게임
+            const [collectedTrash, setCollectedTrash] = useState([]);
+            const [seaTrash, setSeaTrash] = useState([]);
+            const [popupTrash, setPopupTrash] = useState(null);
+            const [feedbackPopup, setFeedbackPopup] = useState(null);
+            const [selectedTrashForSort, setSelectedTrashForSort] = useState(null);
+            const [sortedTrash, setSortedTrash] = useState([]);
+
+            // 칭찬 스티커 모음
+            const [collectedStickers, setCollectedStickers] = useState([]);
+
+            // 화면녹화 (설계도)
+            const screenRecorderRef = useRef(null);
+            const screenChunksRef = useRef([]);
+            const [isScreenRecording, setIsScreenRecording] = useState(false);
+
+            // ============================================================
+            // 스케일 훅 (반응형) - 짤림 없게, 위아래 살짝 여백
+            // ============================================================
+            const useScale = () => {
+                const [scale, setScale] = useState(1);
+                useEffect(() => {
+                    const handleResize = () => {
+                        const targetW = 1920, targetH = 1080;
+                        const scaleX = window.innerWidth / targetW;
+                        const scaleY = window.innerHeight / targetH;
+                        // 더 작은 비율 * 0.96 -> 어떤 화면에서도 안 잘리게 살짝 여백
+                        setScale(Math.min(scaleX, scaleY) * 0.96);
+                    };
+                    window.addEventListener('resize', handleResize);
+                    handleResize();
+                    return () => window.removeEventListener('resize', handleResize);
+                }, []);
+                return scale;
+            };
+            const scale = useScale();
+
+            // ============================================================
+            // 마이크 권한 게이트 (앱 시작 시 1회)
+            // ============================================================
+            const requestMicPermission = async () => {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    stream.getTracks().forEach(t => t.stop());
+                    setMicPermissionGranted(true);
+                    setShowMicGate(false);
+                } catch (err) {
+                    // 거부해도 진행은 가능 (키보드 입력)
+                    setMicPermissionGranted(false);
+                    setShowMicGate(false);
+                }
+            };
+
+            // ============================================================
+            // 데이터 로드
+            // ============================================================
+            useEffect(() => {
+                loadKoreanVoice(); // 음성 미리 로드
+
+                if (!GAS_URL || !GAS_URL.startsWith("http")) {
+                    setStudents(["김철수", "이영희", "박지민"]);
+                    setProblems([
+                        { type: '플라스틱류', name: '플라스틱 컵', svgType: 'plastic-cup', icon: '🥤', fact: '플라스틱 컵은\n내용물을 비우고 버려요!' },
+                        { type: '종이류', name: '종이상자', svgType: 'paper-box', icon: '📦', fact: '종이상자는 테이프를 떼고\n납작하게 접어서 버려요!' },
+                        { type: '병류', name: '유리병', svgType: 'glass-bottle', icon: '🫙', fact: '유리병은 깨지지 않게\n조심해서 버려요.' },
+                        { type: '캔류', name: '통조림 캔', svgType: 'can', icon: '🥫', fact: '통조림 캔은 다 먹고\n안을 깨끗이 씻어서 버려요.' },
+                        { type: '비닐류', name: '비닐 봉투', svgType: 'plastic-bag', icon: '🛍️', fact: '비닐은 따로 모아서 버려요.\n바다 생물이 아파해요!' },
+                        { type: '일반쓰레기', name: '종이컵', svgType: 'paper-cup', icon: '☕', fact: '종이컵은 안쪽에 비닐이 발라져 있어요.\n그래서 일반쓰레기로 버려요!' },
+                        { type: '일반쓰레기', name: '사용한 휴지', svgType: 'tissue', icon: '🧻', fact: '사용한 휴지는 재활용이 안 돼요.\n일반쓰레기로 버려요!' }
+                    ]);
+                    setIsLoading(false);
+                    return;
+                }
+
+                fetch(`${GAS_URL}?action=getData`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.students) setStudents(data.students.filter(s => s));
+                        if (data.problems) {
+                            const parsed = data.problems.map(p => {
+                                let newIcon = p.icon;
+                                let newName = p.name;
+                                if (p.type === '플라스틱류') { newIcon = '🥤'; newName = newName || '플라스틱 컵'; }
+                                else if (p.type === '종이류') { newIcon = '📦'; newName = newName || '종이상자'; }
+                                else if (p.type === '병류' || p.type === '유리류') { newIcon = '🫙'; newName = newName || '유리병'; }
+                                else if (p.type === '캔류') { newIcon = '🥫'; newName = newName || '통조림 캔'; }
+                                else if (p.type === '비닐류') { newIcon = '🛍️'; newName = newName || '비닐 봉투'; }
+                                else if (p.type === '일반쓰레기') { newIcon = p.icon || '🗑️'; newName = newName || '쓰레기'; }
+                                return {
+                                    type: p.type,
+                                    name: newName,
+                                    icon: newIcon,
+                                    svgType: NAME_TO_SVG[newName] || null,  // 이름 기준 SVG 자동 매칭
+                                    fact: (p.fact || '분리수거를 잘 합시다!').replace(/\\n/g, '\n')
+                                };
+                            }).filter(p => p.type && p.name);
+                            // 일반쓰레기가 없으면 자동 추가 (헷갈리는 것 학습용)
+                            if (!parsed.some(p => p.type === '일반쓰레기')) {
+                                parsed.push(
+                                    { type: '일반쓰레기', name: '종이컵', svgType: 'paper-cup', icon: '☕', fact: '종이컵은 안쪽에 비닐이 발라져 있어요.\n그래서 일반쓰레기로 버려요!' },
+                                    { type: '일반쓰레기', name: '사용한 휴지', svgType: 'tissue', icon: '🧻', fact: '사용한 휴지는 재활용이 안 돼요.\n일반쓰레기로 버려요!' }
+                                );
+                            }
+                            setProblems(parsed);
+                        }
+                        if (data.examples && Array.isArray(data.examples) && data.examples.length > 0) {
+                            setExampleSentences(data.examples);
+                        }
+                        setIsLoading(false);
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        setStudents(["김철수", "이영희", "박지민"]);
+                        setProblems([
+                            { type: '플라스틱류', name: '플라스틱 컵', svgType: 'plastic-cup', icon: '🥤', fact: '플라스틱 컵은\n내용물을 비우고 버려요!' },
+                            { type: '종이류', name: '종이상자', svgType: 'paper-box', icon: '📦', fact: '종이상자는 테이프를 떼고\n납작하게 접어서 버려요!' },
+                            { type: '병류', name: '유리병', svgType: 'glass-bottle', icon: '🫙', fact: '유리병은 깨지지 않게\n조심해서 버려요.' },
+                            { type: '캔류', name: '통조림 캔', svgType: 'can', icon: '🥫', fact: '통조림 캔은 다 먹고\n안을 깨끗이 씻어서 버려요.' },
+                            { type: '비닐류', name: '비닐 봉투', svgType: 'plastic-bag', icon: '🛍️', fact: '비닐은 따로 모아서 버려요.\n바다 생물이 아파해요!' },
+                            { type: '일반쓰레기', name: '종이컵', svgType: 'paper-cup', icon: '☕', fact: '종이컵은 안쪽에 비닐이 발라져 있어요.\n그래서 일반쓰레기로 버려요!' },
+                            { type: '일반쓰레기', name: '사용한 휴지', svgType: 'tissue', icon: '🧻', fact: '사용한 휴지는 재활용이 안 돼요.\n일반쓰레기로 버려요!' }
+                        ]);
+                        setIsLoading(false);
+                    });
+            }, []);
+
+            // ============================================================
+            // 오디오 처리
+            // ============================================================
+            const stopSpeak = () => {
+                if (window.speechSynthesis) window.speechSynthesis.cancel();
+            };
+
+            const speak = (text, opts = {}) => {
+                if (!speakerEnabled || !window.speechSynthesis || !text) return;
+                stopSpeak();
+                const utter = new SpeechSynthesisUtterance(text);
+                utter.lang = 'ko-KR';
+                utter.rate = opts.rate ?? 0.95;
+                utter.pitch = opts.pitch ?? 1.0;
+                utter.volume = 1.0;
+                if (cachedVoice) utter.voice = cachedVoice;
+                window.speechSynthesis.speak(utter);
+            };
+
+            const playEffect = (type) => {
+                if (!speakerEnabled) return;
+                try {
+                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    const oscillator = audioCtx.createOscillator();
+                    const gainNode = audioCtx.createGain();
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+
+                    if (type === 'correct') {
+                        oscillator.type = 'sine';
+                        oscillator.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+                        oscillator.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1);
+                        oscillator.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2);
+                        gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.6);
+                        oscillator.start();
+                        oscillator.stop(audioCtx.currentTime + 0.6);
+                    } else if (type === 'wrong') {
+                        oscillator.type = 'sawtooth';
+                        oscillator.frequency.setValueAtTime(300, audioCtx.currentTime);
+                        oscillator.frequency.setValueAtTime(200, audioCtx.currentTime + 0.2);
+                        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.4);
+                        oscillator.start();
+                        oscillator.stop(audioCtx.currentTime + 0.4);
+                    } else if (type === 'sticker') {
+                        oscillator.type = 'sine';
+                        oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
+                        oscillator.frequency.setValueAtTime(1108, audioCtx.currentTime + 0.08);
+                        oscillator.frequency.setValueAtTime(1318, audioCtx.currentTime + 0.16);
+                        gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.4);
+                        oscillator.start();
+                        oscillator.stop(audioCtx.currentTime + 0.4);
+                    }
+                } catch (e) { console.log(e); }
+            };
+
+            // 자동 음성 안내
+            useEffect(() => {
+                if (!speakerEnabled) return;
+                let text = "";
+                switch (step) {
+                    case 0: text = "이름을 골라서 멋진 분리수거 박사가 되어볼까요?"; break;
+                    case 1: text = "활동 전에 먼저, 지금 알고 있는 분리수거에 대해 말해주세요."; break;
+                    case 2: text = "바다에 떠다니는 쓰레기들을 손가락으로 눌러서 모두 주워주세요."; break;
+                    case 3: text = "주운 쓰레기를 누르고, 알맞은 분리수거함을 골라주세요."; break;
+                    case 4: text = "헷갈리는 분리수거! 잘 모르겠으면 힌트 버튼을 눌러봐요."; break;
+                    case 5: text = "쓰레기의 놀라운 변신! 어떤 물건으로 변하는지 짝을 맞춰보세요."; break;
+                    case 6: text = "예시 작품을 보고, 나만의 작품 이름을 녹음해주세요!"; break;
+                    case 7: text = "재활용품으로 무엇을 만들지 설계도를 그려보세요!"; break;
+                    case 8: text = "내가 녹화한 영상을 다시 보고, 스스로 별점을 줘봐요!"; break;
+                    case 9: text = "완성한 작품 사진이 있다면 찍어 올려주세요!"; break;
+                    case 10: text = "활동 후, 새롭게 알게 된 점을 말해주세요. 처음과 비교해봐요!"; break;
+                    case 11: text = "최고의 분리수거 박사! 스스로에게 별점을 주고 임명장을 받아가세요!"; break;
+                }
+                if (text) setTimeout(() => speak(text), 500);
+            }, [step, speakerEnabled]);
+
+            // ============================================================
+            // 핸들러
+            // ============================================================
+            const handleNextStep = () => {
+                stopSpeak();
+                setStep(prev => prev + 1);
+            };
+
+            const handleToggleSpeaker = () => {
+                const next = !speakerEnabled;
+                setSpeakerEnabled(next);
+                if (next) {
+                    setTimeout(() => speak("소리가 켜졌어요! 이제 잘 들으면서 활동해봐요."), 100);
+                } else {
+                    stopSpeak();
+                }
+            };
+
+            const startCollecting = () => {
+                const initial = problems.map((p, i) => ({
+                    ...p,
+                    uid: Date.now() + i,
+                    x: Math.random() * 70 + 10,
+                    y: Math.random() * 60 + 15
+                }));
+                setSeaTrash(initial);
+                setCollectedTrash([]);
+                handleNextStep();
+            };
+
+            const handleCollect = (trash) => {
+                setSeaTrash(prev => prev.filter(t => t.uid !== trash.uid));
+                setPopupTrash(trash);
+                speak(trash.fact);
+            };
+
+            const closePopupAndContinue = () => {
+                setCollectedTrash(prev => [...prev, popupTrash]);
+                setPopupTrash(null);
+            };
+
+            const getPostPosition = (word) => {
+                if (!word) return '은(는)';
+                const lastChar = word.charCodeAt(word.length - 1);
+                if (lastChar < 0xAC00 || lastChar > 0xD7A3) return '은(는)';
+                const hasJongseong = (lastChar - 0xAC00) % 28 > 0;
+                return hasJongseong ? '은' : '는';
+            };
+
+            const handleSort = (trash, targetBinId) => {
+                const josa = getPostPosition(trash.name);
+                if (trash.type === targetBinId) {
+                    playEffect('correct');
+                    triggerCelebration('normal');
+                    const binName = BIN_TYPES.find(b => b.id === targetBinId).name;
+                    speak(`맞았어요! ${trash.name}${josa} ${binName}에 버려야 해요.`);
+                    setFeedbackPopup({ isCorrect: true, message: `딩동댕!\n${trash.name}${josa} ${binName}에 쏙!` });
+                    setTimeout(() => {
+                        setFeedbackPopup(null);
+                        setCollectedTrash(prev => prev.filter(t => t.uid !== trash.uid));
+                        setSortedTrash(prev => [...prev, trash]);
+                        setSelectedTrashForSort(null);
+                    }, 1800);
+                } else {
+                    playEffect('wrong');
+                    const correctBin = BIN_TYPES.find(b => b.id === trash.type);
+                    speak(`아니에요. ${trash.name}${josa} ${correctBin ? correctBin.name : ''}에 버려요. 다시 해봐요!`);
+                    setFeedbackPopup({
+                        isCorrect: false,
+                        message: `이런!\n${trash.name}${josa} 여기가 아니에요.\n${correctBin ? correctBin.name + '을(를) 찾아봐요!' : '다시 골라봐요!'}`
+                    });
+                    setSelectedTrashForSort(null);
+                    setTimeout(() => setFeedbackPopup(null), 2500);
+                }
+            };
+
+            // ============================================================
+            // 화면 녹화 (설계도 단계)
+            // ============================================================
+            const startScreenRecording = async () => {
+                try {
+                    const displayStream = await navigator.mediaDevices.getDisplayMedia({
+                        video: { mediaSource: "screen" },
+                        audio: false
+                    });
+                    let combinedStream = displayStream;
+                    try {
+                        const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        combinedStream = new MediaStream([
+                            ...displayStream.getVideoTracks(),
+                            ...audioStream.getAudioTracks()
+                        ]);
+                    } catch (e) { /* 마이크 없어도 화면만 녹화 */ }
+
+                    screenChunksRef.current = [];
+                    const recorder = new MediaRecorder(combinedStream, { mimeType: 'video/webm' });
+                    recorder.ondataavailable = e => { if (e.data.size > 0) screenChunksRef.current.push(e.data); };
+                    recorder.onstop = () => {
+                        const blob = new Blob(screenChunksRef.current, { type: 'video/webm' });
+                        const reader = new FileReader();
+                        reader.onloadend = () => setBlueprintScreenRec(reader.result);
+                        reader.readAsDataURL(blob);
+                        combinedStream.getTracks().forEach(t => t.stop());
+                    };
+
+                    // 사용자가 브라우저 자체 "공유 중지" 버튼을 누르는 경우 처리
+                    displayStream.getVideoTracks()[0].addEventListener('ended', () => {
+                        if (recorder.state !== 'inactive') recorder.stop();
+                        setIsScreenRecording(false);
+                    });
+
+                    recorder.start();
+                    screenRecorderRef.current = recorder;
+                    setIsScreenRecording(true);
+                    speak("녹화를 시작했어요! 그리면서 어떤 작품을 만들지 말해주세요.");
+                } catch (err) {
+                    // 권한 거부되거나 환경상 불가 - 친절한 안내
+                    speak("녹화를 시작할 수 없어요. 그냥 그리기만 해도 괜찮아요!");
+                    console.log("화면 녹화 사용 불가:", err.message);
+                }
+            };
+
+            const stopScreenRecording = () => {
+                if (screenRecorderRef.current && screenRecorderRef.current.state !== 'inactive') {
+                    screenRecorderRef.current.stop();
+                }
+                setIsScreenRecording(false);
+            };
+
+            const downloadCertificate = () => {
+                const element = document.getElementById("certificate-area");
+                if (element && window.html2canvas) {
+                    window.html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#ffffff' }).then(canvas => {
+                        const link = document.createElement("a");
+                        link.download = `${studentName}_분리수거대장_임명장.png`;
+                        link.href = canvas.toDataURL("image/png");
+                        link.click();
+                    });
+                }
+            };
+
+            const saveAllData = () => {
+                setIsSaving(true);
+                const quizCorrect = quizResults.filter(r => r.correct).length;
+                const quizHelpUsed = quizResults.filter(r => r.helpUsed).length;
+                const data = {
+                    studentName,
+                    artworkNameText: artworkNameData ? artworkNameData.text : "",
+                    preRecordText: preRecordData?.text || "",
+                    preRecordUrl: "",
+                    postRecordText: postRecordData?.text || "",
+                    postRecordUrl: "",
+                    blueprintImageUrl: "",
+                    blueprintDriveUrl: "",
+                    actualImageUrl: "",
+                    actualDriveUrl: "",
+                    screenRecUrl: "",
+                    stars,
+                    blueprintSelfStars,
+                    stickers: collectedStickers.length,
+                    helpUsed: helpUsedCount.pre + helpUsedCount.post + helpUsedCount.artwork + (helpUsedCount.quiz || 0),
+                    quizCorrect,
+                    quizTotal: TRICKY_QUIZZES.length,
+                    quizHelpUsed,
+                    matchedCount: matchedPairs.length,
+                    sortedCount: sortedTrash.length
+                };
+
+                if (!GAS_URL || !GAS_URL.startsWith("http")) {
+                    setTimeout(() => {
+                        setIsSaving(false);
+                        alert("저장이 완료되었습니다! (로컬 모드)");
+                        window.location.reload();
+                    }, 1500);
+                    return;
+                }
+
+                const uploadPromises = [];
+                if (preRecordData?.base64) {
+                    uploadPromises.push(
+                        fetch(GAS_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                            body: JSON.stringify({ action: 'uploadAudio', base64Data: preRecordData.base64, filename: `${studentName}_사전녹음.webm` })
+                        }).then(res => res.json()).then(r => ({ type: 'pre', url: r.url }))
+                    );
+                }
+                if (postRecordData?.base64) {
+                    uploadPromises.push(
+                        fetch(GAS_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                            body: JSON.stringify({ action: 'uploadAudio', base64Data: postRecordData.base64, filename: `${studentName}_사후녹음.webm` })
+                        }).then(res => res.json()).then(r => ({ type: 'post', url: r.url }))
+                    );
+                }
+                if (blueprintData) {
+                    uploadPromises.push(
+                        fetch(GAS_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                            body: JSON.stringify({ action: 'uploadImage', base64Data: blueprintData, filename: `${studentName}_설계도.png` })
+                        }).then(res => res.json()).then(r => ({ type: 'blueprint', driveUrl: r.driveUrl, imageUrl: r.imageUrl }))
+                    );
+                }
+                if (actualArtworkData) {
+                    uploadPromises.push(
+                        fetch(GAS_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                            body: JSON.stringify({ action: 'uploadImage', base64Data: actualArtworkData, filename: `${studentName}_실제작품.png` })
+                        }).then(res => res.json()).then(r => ({ type: 'actual', driveUrl: r.driveUrl, imageUrl: r.imageUrl }))
+                    );
+                }
+                if (blueprintScreenRec) {
+                    uploadPromises.push(
+                        fetch(GAS_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                            body: JSON.stringify({ action: 'uploadVideo', base64Data: blueprintScreenRec, filename: `${studentName}_설계도녹화.webm` })
+                        }).then(res => res.json()).then(r => ({ type: 'screen', url: r.url }))
+                    );
+                }
+
+                Promise.all(uploadPromises).then(results => {
+                    results.forEach(r => {
+                        if (r.type === 'pre') data.preRecordUrl = r.url;
+                        if (r.type === 'post') data.postRecordUrl = r.url;
+                        if (r.type === 'blueprint') { data.blueprintDriveUrl = r.driveUrl; data.blueprintImageUrl = r.imageUrl; }
+                        if (r.type === 'actual') { data.actualDriveUrl = r.driveUrl; data.actualImageUrl = r.imageUrl; }
+                        if (r.type === 'screen') data.screenRecUrl = r.url;
+                    });
+                    return fetch(GAS_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify({ action: 'saveResult', resultData: data })
+                    });
+                })
+                .then(res => res.json())
+                .then(resData => {
+                    setIsSaving(false);
+                    if (resData.success) {
+                        alert("저장되었어요! 활동을 마칠게요. 수고했어요!");
+                        window.location.reload();
+                    } else {
+                        alert("저장 실패: " + resData.error);
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert("서버 연결에 실패했어요. 다시 시도해주세요.");
+                    setIsSaving(false);
+                });
+            };
+
+            // ============================================================
+            // 칭찬 스티커 컴포넌트
+            // ============================================================
+            const StickerReward = ({ onAdd, label }) => {
+                const stickerOptions = [
+                    { emoji: '⭐', name: '반짝별' },
+                    { emoji: '💖', name: '사랑하트' },
+                    { emoji: '🌸', name: '예쁜꽃' },
+                    { emoji: '🌟', name: '큰별' },
+                    { emoji: '🎉', name: '폭죽' },
+                    { emoji: '🏆', name: '트로피' }
+                ];
+                const [picked, setPicked] = useState(null);
+
+                const give = (s) => {
+                    setPicked(s);
+                    playEffect('sticker');
+                    triggerCelebration('big');
+                    onAdd(s);
+                };
+
+                return (
+                    <div className="bg-gradient-to-br from-pink-50 to-purple-50 p-8 rounded-[3rem] border-8 border-pink-300 shadow-2xl">
+                        <h3 className="text-4xl font-bold text-pink-700 text-center mb-2">🎁 나에게 칭찬 스티커 주기!</h3>
+                        <p className="text-2xl font-bold text-purple-600 text-center mb-6">녹음을 잘 했어요! 어떤 스티커를 줄까요?</p>
+                        <div className="grid grid-cols-6 gap-4">
+                            {stickerOptions.map(s => (
+                                <button
+                                    key={s.emoji}
+                                    onClick={() => give(s)}
+                                    disabled={picked}
+                                    className={`p-4 rounded-3xl border-4 transition-all ${picked === s ? 'border-pink-500 bg-pink-100 scale-110' : 'border-pink-200 bg-white hover:bg-pink-50 hover:scale-105'} ${picked && picked !== s ? 'opacity-30' : ''}`}
+                                >
+                                    <div className="text-6xl mb-2">{s.emoji}</div>
+                                    <div className="text-xl font-bold text-pink-700">{s.name}</div>
+                                </button>
+                            ))}
+                        </div>
+                        {picked && (
+                            <motion.p
+                                initial={{ scale: 0 }} animate={{ scale: 1 }}
+                                className="text-3xl font-bold text-purple-700 text-center mt-6"
+                            >
+                                {picked.emoji} {picked.name} 스티커를 받았어요! 정말 잘했어요! {picked.emoji}
+                            </motion.p>
+                        )}
+                    </div>
+                );
+            };
+
+            // ============================================================
+            // 녹음 컴포넌트 (개선판: 키보드 입력, 도움받기, 자기 별점, 다시 녹음, 칭찬 스티커)
+            // ============================================================
+            const RecorderComponent = ({ onComplete, defaultText, helpKey, exampleList, showSelfRating = true, showSticker = true }) => {
+                const [isRecording, setIsRecording] = useState(false);
+                const [text, setText] = useState("");
+                const [audioBase64, setAudioBase64] = useState(null);
+                const [audioBlob, setAudioBlob] = useState(null);
+                const [phase, setPhase] = useState('idle'); // idle | recording | review | sticker
+                const [selfStars, setSelfStars] = useState(0);
+                const [helpCount, setHelpCount] = useState(0);
+                const [stickerGiven, setStickerGiven] = useState(null);
+
+                const textRef = useRef("");
+                const mediaRecorderRef = useRef(null);
+                const chunksRef = useRef([]);
+                const recognitionRef = useRef(null);
+                const streamRef = useRef(null);
+
+                const updateText = (newText) => {
+                    setText(newText);
+                    textRef.current = newText;
+                };
+
+                const startRecording = async () => {
+                    stopSpeak();
+                    updateText("");
+                    chunksRef.current = [];
+                    setAudioBase64(null);
+                    setAudioBlob(null);
+
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        streamRef.current = stream;
+                        const recorder = new MediaRecorder(stream);
+                        mediaRecorderRef.current = recorder;
+
+                        recorder.ondataavailable = e => {
+                            if (e.data.size > 0) chunksRef.current.push(e.data);
+                        };
+                        recorder.onstop = () => {
+                            const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+                            setAudioBlob(blob);
+                            const reader = new FileReader();
+                            reader.onloadend = () => setAudioBase64(reader.result);
+                            reader.readAsDataURL(blob);
+                            stream.getTracks().forEach(t => t.stop());
+                        };
+                        recorder.start();
+
+                        // STT
+                        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                            recognitionRef.current = new SR();
+                            recognitionRef.current.lang = 'ko-KR';
+                            recognitionRef.current.continuous = true;
+                            recognitionRef.current.interimResults = true;
+
+                            let finalText = "";
+                            recognitionRef.current.onresult = (event) => {
+                                let interim = '';
+                                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                                    if (event.results[i].isFinal) {
+                                        finalText += event.results[i][0].transcript + " ";
+                                    } else {
+                                        interim += event.results[i][0].transcript;
+                                    }
+                                }
+                                updateText((finalText + interim).trim());
+                            };
+                            try { recognitionRef.current.start(); } catch (e) { }
+                        }
+
+                        setIsRecording(true);
+                        setPhase('recording');
+                        speak("녹음을 시작했어요. 천천히 말해주세요.");
+                    } catch (err) {
+                        alert("마이크를 사용할 수 없어요. 키보드로 직접 입력해도 괜찮아요!");
+                        setPhase('review'); // 키보드 모드로 진입
+                    }
+                };
+
+                const stopRecording = () => {
+                    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+                        mediaRecorderRef.current.stop();
+                    }
+                    if (recognitionRef.current) {
+                        try { recognitionRef.current.stop(); } catch (e) { }
+                    }
+                    setIsRecording(false);
+                    setPhase('review');
+                };
+
+                const playBack = () => {
+                    if (!audioBlob) return;
+                    const url = URL.createObjectURL(audioBlob);
+                    const audio = new Audio(url);
+                    audio.play();
+                };
+
+                const playText = () => {
+                    speak(text, { rate: 0.9 });
+                };
+
+                const readHelp = (sentence) => {
+                    speak(sentence, { rate: 0.85 });
+                    setHelpCount(prev => prev + 1);
+                    setHelpUsedCount(prev => ({ ...prev, [helpKey]: (prev[helpKey] || 0) + 1 }));
+                };
+
+                const retryRecord = () => {
+                    setSelfStars(0);
+                    setStickerGiven(null);
+                    setPhase('idle');
+                    updateText("");
+                    setAudioBase64(null);
+                    setAudioBlob(null);
+                };
+
+                const finalSubmit = () => {
+                    onComplete({
+                        text: textRef.current,
+                        base64: audioBase64,
+                        selfStars,
+                        helpCount,
+                        sticker: stickerGiven
+                    });
+                };
+
+                const handleSelfStar = (n) => {
+                    setSelfStars(n);
+                    if (n >= 4) {
+                        triggerCelebration('big');
+                        playEffect('correct');
+                    } else {
+                        playEffect('sticker');
+                    }
+                };
+
+                return (
+                    <div className="bg-white p-10 rounded-[3rem] shadow-2xl max-w-5xl w-full flex flex-col items-center gap-6 border-8 border-green-300">
+                        <h3 className="text-5xl font-bold text-green-800 text-center break-keep leading-tight">{defaultText}</h3>
+
+                        {/* 도움받기 버튼 (예시 문장 듣기) */}
+                        <div className="w-full bg-yellow-50 border-4 border-yellow-300 rounded-3xl p-5 flex flex-col gap-3">
+                            <div className="flex items-center gap-3">
+                                <span className="text-3xl">💡</span>
+                                <span className="text-3xl font-bold text-yellow-800">어려우면 도움받기!</span>
+                                {helpCount > 0 && <span className="ml-auto bg-yellow-200 text-yellow-800 px-4 py-1 rounded-full text-xl font-bold">도움받았어요 {helpCount}번</span>}
+                            </div>
+                            <div className="flex gap-2 flex-wrap">
+                                {exampleList.slice(0, 3).map((ex, i) => (
+                                    <button key={i} onClick={() => readHelp(ex)}
+                                        className="flex-1 min-w-[200px] bg-white border-4 border-yellow-300 rounded-2xl p-3 text-xl font-bold text-yellow-900 hover:bg-yellow-100 active:scale-95">
+                                        <Icon name="Volume2" size={28} className="inline mr-2" />
+                                        예시 {i + 1} 듣기
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* 텍스트 표시 / 키보드 입력 */}
+                        <div className="w-full">
+                            <label className="text-2xl font-bold text-gray-600 mb-2 block">📝 말한 내용 (또는 직접 쓰기)</label>
+                            <textarea
+                                value={text}
+                                onChange={e => updateText(e.target.value)}
+                                placeholder={isRecording ? "듣고 있어요..." : "여기에 말한 내용이 나타나거나, 직접 글로 쓸 수 있어요!"}
+                                className="w-full min-h-[10rem] bg-green-50 rounded-2xl p-6 border-4 border-green-200 text-3xl text-gray-800 leading-relaxed focus:outline-none focus:border-green-500 font-bold"
+                                style={{ fontFamily: "'Nanum Gothic', sans-serif" }}
+                            />
+                        </div>
+
+                        {/* idle: 시작 버튼 */}
+                        {phase === 'idle' && (
+                            <div className="flex gap-4 w-full">
+                                <button onClick={startRecording}
+                                    className="flex-1 flex items-center justify-center gap-3 bg-red-500 text-white px-8 py-6 rounded-full text-3xl font-bold hover:bg-red-600 shadow-lg active:scale-95">
+                                    <Icon name="Mic" size={40} /> 🎤 녹음 시작
+                                </button>
+                                <button onClick={() => setPhase('review')}
+                                    className="flex-1 flex items-center justify-center gap-3 bg-blue-500 text-white px-8 py-6 rounded-full text-3xl font-bold hover:bg-blue-600 shadow-lg active:scale-95">
+                                    ⌨️ 글로 쓸래요
+                                </button>
+                                <button onClick={() => onComplete({ text: "", base64: null, selfStars: 0, helpCount, sticker: null })}
+                                    className="flex items-center justify-center gap-2 bg-gray-300 text-gray-700 px-6 py-6 rounded-full text-2xl font-bold hover:bg-gray-400 active:scale-95">
+                                    건너뛰기
+                                </button>
+                            </div>
+                        )}
+
+                        {/* recording: 녹음 중 */}
+                        {phase === 'recording' && (
+                            <button onClick={stopRecording}
+                                className="w-full flex items-center justify-center gap-3 bg-gray-800 text-white px-8 py-6 rounded-full text-3xl font-bold hover:bg-gray-900 shadow-lg ripple active:scale-95">
+                                <Icon name="Square" size={40} /> ⏹️ 녹음 끝!
+                            </button>
+                        )}
+
+                        {/* review: 들어보고 별점 주기 (조건부) */}
+                        {phase === 'review' && (
+                            <div className="w-full flex flex-col gap-5">
+                                {/* 듣기 버튼들 */}
+                                <div className="flex gap-3 flex-wrap">
+                                    {audioBlob && (
+                                        <button onClick={playBack}
+                                            className="flex-1 min-w-[200px] flex items-center justify-center gap-2 bg-purple-500 text-white px-6 py-4 rounded-full text-2xl font-bold hover:bg-purple-600 active:scale-95">
+                                            <Icon name="Play" size={28} /> 내 녹음 듣기
+                                        </button>
+                                    )}
+                                    {text && (
+                                        <button onClick={playText}
+                                            className="flex-1 min-w-[200px] flex items-center justify-center gap-2 bg-indigo-500 text-white px-6 py-4 rounded-full text-2xl font-bold hover:bg-indigo-600 active:scale-95">
+                                            <Icon name="Volume2" size={28} /> 완성한 문장 듣기
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* 별점은 showSelfRating=true일 때만 (사후 녹음 전용) */}
+                                {showSelfRating && (
+                                    <>
+                                        <div className="bg-yellow-50 border-4 border-yellow-300 rounded-3xl p-5">
+                                            <p className="text-3xl font-bold text-yellow-800 text-center mb-3">⭐ 내 녹음, 어떤 것 같아요?</p>
+                                            <div className="flex gap-3 justify-center">
+                                                {[1, 2, 3, 4, 5].map(n => (
+                                                    <button key={n} onClick={() => handleSelfStar(n)}
+                                                        className="star-btn">
+                                                        <Icon name="Star" size={60}
+                                                            className={selfStars >= n ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300 fill-gray-100'} />
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* 별점 결과에 따른 안내 */}
+                                        {selfStars > 0 && selfStars <= 3 && (
+                                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                                                className="bg-orange-50 border-4 border-orange-300 rounded-3xl p-5 text-center">
+                                                <p className="text-3xl font-bold text-orange-700 mb-3">💪 한 번 더 도전해볼래요?</p>
+                                                <p className="text-2xl text-orange-600 mb-4">더 잘 할 수 있어요!</p>
+                                                <div className="flex gap-3 justify-center">
+                                                    <button onClick={retryRecord}
+                                                        className="bg-orange-500 text-white px-8 py-4 rounded-full text-2xl font-bold hover:bg-orange-600 active:scale-95">
+                                                        🔄 다시 녹음할래요!
+                                                    </button>
+                                                    <button onClick={() => showSticker ? setPhase('sticker') : finalSubmit()}
+                                                        className="bg-gray-300 text-gray-700 px-8 py-4 rounded-full text-2xl font-bold hover:bg-gray-400 active:scale-95">
+                                                        {showSticker ? '그대로 진행할래요' : '다음으로 →'}
+                                                    </button>
+                                                </div>
+                                            </motion.div>
+                                        )}
+
+                                        {selfStars >= 4 && (
+                                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                                                className="bg-green-50 border-4 border-green-300 rounded-3xl p-5 text-center">
+                                                <p className="text-3xl font-bold text-green-700 mb-3">🌟 정말 잘했어요!</p>
+                                                <div className="flex gap-3 justify-center flex-wrap">
+                                                    <button onClick={retryRecord}
+                                                        className="bg-blue-400 text-white px-8 py-4 rounded-full text-2xl font-bold hover:bg-blue-500 active:scale-95">
+                                                        🔄 그래도 다시 녹음할래요
+                                                    </button>
+                                                    <button onClick={() => showSticker ? setPhase('sticker') : finalSubmit()}
+                                                        className="bg-green-500 text-white px-8 py-4 rounded-full text-2xl font-bold hover:bg-green-600 active:scale-95">
+                                                        {showSticker ? '✨ 칭찬 스티커 받기!' : '다음으로 →'}
+                                                    </button>
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </>
+                                )}
+
+                                {/* 별점 없는 경우 (사전·중간 녹음): 바로 다음 버튼 */}
+                                {!showSelfRating && (audioBlob || text) && (
+                                    <div className="flex gap-3 flex-wrap">
+                                        <button onClick={retryRecord}
+                                            className="flex-1 min-w-[200px] bg-blue-400 text-white px-6 py-4 rounded-full text-2xl font-bold hover:bg-blue-500 active:scale-95">
+                                            🔄 다시 녹음할래요
+                                        </button>
+                                        <button onClick={() => onComplete({ text: textRef.current, base64: audioBase64, selfStars: 0, helpCount, sticker: null })}
+                                            className="flex-1 min-w-[200px] bg-green-500 text-white px-6 py-4 rounded-full text-2xl font-bold hover:bg-green-600 active:scale-95">
+                                            다음으로 →
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* 키보드만 사용한 경우 (별점 표시 안 함) */}
+                                {showSelfRating && selfStars === 0 && text && !audioBlob && (
+                                    <button onClick={() => showSticker ? setPhase('sticker') : finalSubmit()}
+                                        className="w-full bg-green-500 text-white py-5 rounded-full text-3xl font-bold hover:bg-green-600 active:scale-95">
+                                        다음으로 →
+                                    </button>
+                                )}
+
+                                {!text && !audioBlob && (
+                                    <button onClick={() => onComplete({ text: "", base64: null, selfStars: 0, helpCount, sticker: null })}
+                                        className="w-full bg-gray-300 text-gray-700 py-5 rounded-full text-2xl font-bold hover:bg-gray-400 active:scale-95">
+                                        건너뛰기
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
+                        {/* sticker: 칭찬 스티커 받기 */}
+                        {phase === 'sticker' && (
+                            <div className="w-full flex flex-col gap-5">
+                                <StickerReward
+                                    label="녹음 완료 스티커"
+                                    onAdd={(s) => {
+                                        setStickerGiven(s);
+                                        setCollectedStickers(prev => [...prev, s]);
+                                        setTimeout(() => finalSubmit(), 1500);
+                                    }}
+                                />
+                                <button onClick={finalSubmit}
+                                    className="w-full bg-gray-300 text-gray-700 py-4 rounded-full text-2xl font-bold hover:bg-gray-400 active:scale-95">
+                                    스티커 없이 다음으로 →
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                );
+            };
+
+            // ============================================================
+            // 설계도 컴포넌트 (튜토리얼 + 화면녹화 안내)
+            // ============================================================
+            const BlueprintComponent = ({ onComplete }) => {
+                const canvasRef = useRef(null);
+                const bgCanvasRef = useRef(null);
+                const fileInputRef = useRef(null);
+                const [color, setColor] = useState('#1e293b');
+                const [tool, setTool] = useState('pen');
+                const [shapes, setShapes] = useState([]);
+                const [selectedId, setSelectedId] = useState(null);
+                const [isDrawing, setIsDrawing] = useState(false);
+                // 튜토리얼: 1단계(만들 작품 설명) → 2단계(녹화 안내) → 닫기
+                const [tutorialStep, setTutorialStep] = useState(1);
+                const [showTutorial, setShowTutorial] = useState(true);
+                const dragStart = useRef(null);
+                const shapeSize = useRef(120);
+                const penLines = useRef([]);
+                const currentLine = useRef(null);
+                const COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#a855f7', '#1e293b', '#64748b', '#ffffff'];
+
+                useEffect(() => {
+                    const canvas = canvasRef.current;
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                }, []);
+
+                const getPos = (e) => {
+                    const canvas = canvasRef.current;
+                    const rect = canvas.getBoundingClientRect();
+                    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                    return {
+                        x: (clientX - rect.left) * (canvas.width / rect.width),
+                        y: (clientY - rect.top) * (canvas.height / rect.height)
+                    };
+                };
+
+                const redraw = (shapeList) => {
+                    const canvas = canvasRef.current;
+                    const ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    const bg = bgCanvasRef.current;
+                    if (bg) ctx.drawImage(bg, 0, 0);
+                    penLines.current.forEach(line => {
+                        if (!line || line.length < 2) return;
+                        ctx.beginPath();
+                        ctx.strokeStyle = line[0].color;
+                        ctx.lineWidth = line[0].width;
+                        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+                        ctx.moveTo(line[0].x, line[0].y);
+                        line.forEach(pt => ctx.lineTo(pt.x, pt.y));
+                        ctx.stroke();
+                    });
+                    shapeList.forEach(shape => {
+                        ctx.save();
+                        ctx.translate(shape.x, shape.y);
+                        ctx.rotate((shape.rotate || 0) * Math.PI / 180);
+                        const hw = shape.w / 2, hh = shape.h / 2;
+                        ctx.fillStyle = shape.color;
+                        ctx.strokeStyle = shape.id === selectedId ? '#3b82f6' : 'rgba(0,0,0,0.15)';
+                        ctx.lineWidth = 5;
+                        ctx.beginPath();
+                        if (shape.type === 'circle') {
+                            ctx.ellipse(0, 0, hw, hh, 0, 0, Math.PI * 2);
+                            ctx.fill(); ctx.stroke();
+                        } else if (shape.type === 'square') {
+                            ctx.fillRect(-hw, -hh, shape.w, shape.h);
+                            ctx.strokeRect(-hw, -hh, shape.w, shape.h);
+                        } else if (shape.type === 'triangle') {
+                            ctx.moveTo(0, -hh); ctx.lineTo(hw, hh); ctx.lineTo(-hw, hh);
+                            ctx.closePath(); ctx.fill(); ctx.stroke();
+                        }
+                        if (shape.id === selectedId) {
+                            ctx.fillStyle = '#3b82f6';
+                            [[hw, -hh], [hw, hh], [-hw, -hh], [-hw, hh]].forEach(([hx, hy]) => {
+                                ctx.beginPath(); ctx.arc(hx, hy, 12, 0, Math.PI * 2); ctx.fill();
+                            });
+                            ctx.fillStyle = '#f59e0b';
+                            ctx.beginPath(); ctx.arc(0, -hh - 36, 16, 0, Math.PI * 2); ctx.fill();
+                        }
+                        ctx.restore();
+                    });
+                };
+
+                useEffect(() => { redraw(shapes); }, [shapes, selectedId]);
+
+                const toLocal = (shape, pos) => {
+                    const angle = (shape.rotate || 0) * Math.PI / 180;
+                    const cos = Math.cos(-angle), sin = Math.sin(-angle);
+                    const dx = pos.x - shape.x, dy = pos.y - shape.y;
+                    return { x: dx * cos - dy * sin, y: dx * sin + dy * cos };
+                };
+
+                const HANDLE_R = 22;
+
+                const onPointerDown = (e) => {
+                    e.preventDefault();
+                    const pos = getPos(e);
+                    if (tool === 'select') {
+                        if (selectedId) {
+                            const shape = shapes.find(s => s.id === selectedId);
+                            if (shape) {
+                                const hw = shape.w / 2, hh = shape.h / 2;
+                                const lp = toLocal(shape, pos);
+                                if (Math.hypot(lp.x, lp.y + hh + 36) < HANDLE_R) {
+                                    dragStart.current = { mode: 'rotate', shapeId: shape.id, cx: shape.x, cy: shape.y };
+                                    return;
+                                }
+                                const corners = [{ lx: hw, ly: -hh }, { lx: hw, ly: hh }, { lx: -hw, ly: -hh }, { lx: -hw, ly: hh }];
+                                for (const c of corners) {
+                                    if (Math.hypot(lp.x - c.lx, lp.y - c.ly) < HANDLE_R) {
+                                        dragStart.current = { mode: 'resize', shapeId: shape.id, origW: shape.w, origH: shape.h };
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                        const hit = [...shapes].reverse().find(s => {
+                            const lp = toLocal(s, pos);
+                            return Math.abs(lp.x) <= s.w / 2 && Math.abs(lp.y) <= s.h / 2;
+                        });
+                        setSelectedId(hit ? hit.id : null);
+                        dragStart.current = hit ? { mode: 'move', ...pos, origX: hit.x, origY: hit.y, shapeId: hit.id } : null;
+                        return;
+                    }
+                    if (tool === 'pen' || tool === 'eraser') {
+                        setIsDrawing(true);
+                        currentLine.current = [{ x: pos.x, y: pos.y, color: tool === 'eraser' ? '#ffffff' : color, width: tool === 'eraser' ? 36 : 6 }];
+                        return;
+                    }
+                    const newShape = { id: Date.now(), type: tool, x: pos.x, y: pos.y, w: shapeSize.current, h: shapeSize.current, color, rotate: 0 };
+                    setShapes(prev => [...prev, newShape]);
+                    setSelectedId(newShape.id);
+                    setTool('select');
+                };
+
+                const onPointerMove = (e) => {
+                    e.preventDefault();
+                    const pos = getPos(e);
+                    if ((tool === 'pen' || tool === 'eraser') && isDrawing && currentLine.current) {
+                        currentLine.current.push({ x: pos.x, y: pos.y, color: currentLine.current[0].color, width: currentLine.current[0].width });
+                        const ctx = canvasRef.current.getContext('2d');
+                        const last = currentLine.current;
+                        if (last.length >= 2) {
+                            ctx.beginPath(); ctx.strokeStyle = last[0].color; ctx.lineWidth = last[0].width;
+                            ctx.lineCap = 'round';
+                            const p2 = last[last.length - 2], p1 = last[last.length - 1];
+                            ctx.moveTo(p2.x, p2.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
+                        }
+                        return;
+                    }
+                    if (tool === 'select' && dragStart.current) {
+                        const dr = dragStart.current;
+                        if (dr.mode === 'rotate') {
+                            const angle = Math.atan2(pos.y - dr.cy, pos.x - dr.cx) * 180 / Math.PI + 90;
+                            setShapes(prev => prev.map(s => s.id === dr.shapeId ? { ...s, rotate: angle } : s));
+                        } else if (dr.mode === 'resize') {
+                            const shape = shapes.find(s => s.id === dr.shapeId);
+                            if (!shape) return;
+                            const lp = toLocal(shape, pos);
+                            const newW = Math.max(40, Math.abs(lp.x) * 2);
+                            const newH = Math.max(40, Math.abs(lp.y) * 2);
+                            setShapes(prev => prev.map(s => s.id === dr.shapeId ? { ...s, w: newW, h: newH } : s));
+                        } else if (dr.mode === 'move') {
+                            const dx = pos.x - dr.x, dy = pos.y - dr.y;
+                            setShapes(prev => prev.map(s => s.id === dr.shapeId ? { ...s, x: dr.origX + dx, y: dr.origY + dy } : s));
+                        }
+                    }
+                };
+
+                const onPointerUp = () => {
+                    if ((tool === 'pen' || tool === 'eraser') && currentLine.current && currentLine.current.length > 1) {
+                        penLines.current = [...penLines.current, currentLine.current];
+                        redraw(shapes);
+                    }
+                    currentLine.current = null;
+                    setIsDrawing(false);
+                    dragStart.current = null;
+                };
+
+                const deleteSelected = () => { setShapes(prev => prev.filter(s => s.id !== selectedId)); setSelectedId(null); };
+
+                const handleFileUpload = (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            const bg = bgCanvasRef.current;
+                            const bgCtx = bg.getContext('2d');
+                            const ratio = Math.min(bg.width / img.width, bg.height / img.height);
+                            bgCtx.clearRect(0, 0, bg.width, bg.height);
+                            bgCtx.drawImage(img, (bg.width - img.width * ratio) / 2, (bg.height - img.height * ratio) / 2, img.width * ratio, img.height * ratio);
+                            redraw(shapes);
+                        };
+                        img.src = ev.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                };
+
+                const clearAll = () => {
+                    penLines.current = []; setShapes([]); setSelectedId(null);
+                    const bg = bgCanvasRef.current;
+                    if (bg) bg.getContext('2d').clearRect(0, 0, bg.width, bg.height);
+                    const ctx = canvasRef.current.getContext('2d');
+                    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+                };
+
+                const submit = () => {
+                    if (isScreenRecording) stopScreenRecording();
+                    onComplete(canvasRef.current.toDataURL('image/png'));
+                };
+
+                const ToolBtn = ({ t, icon, label }) => (
+                    <button onClick={() => { setTool(t); setSelectedId(null); }}
+                        className={`py-3 rounded-xl flex flex-col items-center gap-1 border-4 text-xl font-bold ${tool === t ? 'bg-blue-100 border-blue-400 text-blue-700' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+                        <Icon name={icon} size={36} /><span>{label}</span>
+                    </button>
+                );
+
+                // 튜토리얼에서 녹화 시작 시도 — 권한창이 뜨는 동안 튜토리얼은 닫음
+                const handleStartRecording = async () => {
+                    setShowTutorial(false);  // 먼저 튜토리얼 닫기 (권한창에 집중)
+                    await startScreenRecording();
+                };
+
+                const handleSkipRecording = () => {
+                    setShowTutorial(false);
+                };
+
+                return (
+                    <div className="absolute inset-0 bg-slate-100 flex flex-row gap-5 p-5">
+
+                        {/* 튜토리얼 팝업 - 2단계 */}
+                        {showTutorial && (
+                            <div className="absolute inset-0 z-50 bg-black/70 flex items-center justify-center p-8">
+
+                                {/* 1단계: "무엇을 만들 건지 말하면서 그려요!" */}
+                                {tutorialStep === 1 && (
+                                    <motion.div
+                                        initial={{ scale: 0.8, opacity: 0 }}
+                                        animate={{ scale: 1, opacity: 1 }}
+                                        className="bg-white rounded-[2.5rem] shadow-2xl border-8 border-purple-300 max-w-3xl w-full overflow-hidden">
+
+                                        <div className="bg-purple-500 px-8 py-5 flex items-center justify-between">
+                                            <span className="text-white text-3xl font-bold">📖 설계도 그리기 안내</span>
+                                            <span className="bg-white/30 text-white text-2xl font-bold px-4 py-1 rounded-full">1 / 2</span>
+                                        </div>
+
+                                        <div className="p-10 flex flex-col gap-6">
+                                            <div className="text-[5rem] text-center leading-none">🗣️🎨</div>
+                                            <h2 className="text-5xl font-bold text-center text-purple-800 leading-tight">
+                                                그리면서 말해봐요!
+                                            </h2>
+
+                                            <div className="bg-purple-50 border-4 border-purple-200 rounded-3xl p-6 flex flex-col gap-4">
+                                                <p className="text-3xl font-bold text-slate-800 leading-relaxed text-center">
+                                                    설계도를 그리면서<br />
+                                                    <span className="bg-yellow-200 px-3 py-1 rounded-xl text-purple-700">"무엇을 만들 건지"</span><br />
+                                                    소리 내어 말해봐요!
+                                                </p>
+                                            </div>
+
+                                            <div className="bg-yellow-50 border-4 border-yellow-300 rounded-3xl p-5">
+                                                <p className="text-2xl font-bold text-yellow-900 mb-3">💡 이렇게 말해봐요:</p>
+                                                <div className="flex flex-col gap-2">
+                                                    <div className="bg-white px-4 py-3 rounded-xl border-2 border-yellow-200 text-xl font-bold text-slate-700">
+                                                        💬 "저는 페트병으로 화분을 만들 거예요!"
+                                                    </div>
+                                                    <div className="bg-white px-4 py-3 rounded-xl border-2 border-yellow-200 text-xl font-bold text-slate-700">
+                                                        💬 "여기에 캔으로 로봇 몸통을 만들어요!"
+                                                    </div>
+                                                    <div className="bg-white px-4 py-3 rounded-xl border-2 border-yellow-200 text-xl font-bold text-slate-700">
+                                                        💬 "종이상자에 바퀴를 붙여서 트럭을 만들 거예요!"
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <button onClick={() => setTutorialStep(2)}
+                                                className="w-full bg-purple-500 text-white py-5 rounded-full text-3xl font-bold shadow-lg hover:bg-purple-600 active:scale-95">
+                                                다음 →
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {/* 2단계: 화면 녹화 안내 */}
+                                {tutorialStep === 2 && (
+                                    <motion.div
+                                        initial={{ scale: 0.8, opacity: 0 }}
+                                        animate={{ scale: 1, opacity: 1 }}
+                                        className="bg-white rounded-[2.5rem] shadow-2xl border-8 border-red-300 max-w-3xl w-full overflow-hidden">
+
+                                        <div className="bg-red-500 px-8 py-5 flex items-center justify-between">
+                                            <span className="text-white text-3xl font-bold">🎬 그리는 모습 녹화하기</span>
+                                            <span className="bg-white/30 text-white text-2xl font-bold px-4 py-1 rounded-full">2 / 2</span>
+                                        </div>
+
+                                        <div className="p-10 flex flex-col gap-6">
+                                            <div className="text-[5rem] text-center leading-none">🔴🎤</div>
+                                            <h2 className="text-4xl font-bold text-center text-red-700 leading-tight">
+                                                목소리와 그리는 모습을<br />함께 녹화해요!
+                                            </h2>
+
+                                            <div className="bg-red-50 border-4 border-red-200 rounded-3xl p-6">
+                                                <p className="text-2xl font-bold text-slate-800 leading-relaxed text-center">
+                                                    아래 <span className="bg-red-200 px-3 py-1 rounded-xl text-red-700">🔴 녹화 시작</span> 버튼을 누르면<br />
+                                                    화면을 공유하라는 창이 떠요.<br /><br />
+                                                    <span className="text-red-600 font-black">"전체 화면"</span>이나<br />
+                                                    <span className="text-red-600 font-black">"이 탭"</span>을 선택하고 <span className="bg-blue-200 px-2 py-1 rounded-lg">공유</span>를 눌러요!
+                                                </p>
+                                            </div>
+
+                                            <div className="bg-blue-50 border-4 border-blue-200 rounded-3xl p-5">
+                                                <p className="text-xl font-bold text-blue-800 leading-relaxed text-center">
+                                                    💡 컴퓨터가 녹화를 못 해도 괜찮아요!<br />
+                                                    <span className="text-blue-600">"녹화 없이 그릴래요"</span> 버튼을 누르면<br />
+                                                    그냥 그리기만 해도 돼요.
+                                                </p>
+                                            </div>
+
+                                            <div className="flex flex-col gap-3">
+                                                <button onClick={handleStartRecording}
+                                                    className="w-full bg-red-500 text-white py-5 rounded-full text-3xl font-bold shadow-lg hover:bg-red-600 active:scale-95">
+                                                    🔴 녹화 시작하고 그리기!
+                                                </button>
+                                                <button onClick={handleSkipRecording}
+                                                    className="w-full bg-slate-300 text-slate-700 py-4 rounded-full text-2xl font-bold hover:bg-slate-400 active:scale-95">
+                                                    ⏭️ 녹화 없이 그릴래요
+                                                </button>
+                                                <button onClick={() => setTutorialStep(1)}
+                                                    className="w-full bg-white text-slate-500 py-3 rounded-full text-xl font-bold border-4 border-slate-200 hover:bg-slate-50 active:scale-95">
+                                                    ← 뒤로
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* 도구 패널 */}
+                        <div className="w-80 bg-white rounded-[2rem] shadow-xl border-slate-200 border-4 p-4 flex flex-col gap-3 shrink-0 overflow-y-auto hide-scrollbar">
+                            <h3 className="text-3xl font-bold text-center text-slate-800">🛠 도구</h3>
+
+                            {/* 화면 녹화 상태 표시 */}
+                            <div className={`border-4 rounded-2xl p-3 flex flex-col gap-2 ${isScreenRecording ? 'bg-red-50 border-red-400 animate-pulse' : blueprintScreenRec ? 'bg-green-50 border-green-300' : 'bg-slate-50 border-slate-200'}`}>
+                                {isScreenRecording && (
+                                    <>
+                                        <div className="flex items-center justify-center gap-2">
+                                            <div className="w-4 h-4 bg-red-500 rounded-full animate-pulse"></div>
+                                            <span className="text-xl font-bold text-red-700">🔴 녹화 중!</span>
+                                        </div>
+                                        <p className="text-base font-bold text-red-600 text-center leading-tight">
+                                            "○○를 만들 거예요!"<br />말해봐요 🗣️
+                                        </p>
+                                        <button onClick={stopScreenRecording}
+                                            className="w-full bg-gray-700 text-white py-2 rounded-full text-lg font-bold active:scale-95">
+                                            ⏹️ 녹화 끝
+                                        </button>
+                                    </>
+                                )}
+                                {!isScreenRecording && blueprintScreenRec && (
+                                    <div className="text-center">
+                                        <div className="text-2xl">✅</div>
+                                        <p className="text-lg font-bold text-green-700">녹화 완료!</p>
+                                        <button onClick={() => { setBlueprintScreenRec(null); startScreenRecording(); }}
+                                            className="w-full mt-2 bg-red-100 text-red-700 border-2 border-red-300 py-2 rounded-full text-base font-bold active:scale-95">
+                                            🔄 다시 녹화
+                                        </button>
+                                    </div>
+                                )}
+                                {!isScreenRecording && !blueprintScreenRec && (
+                                    <>
+                                        <p className="text-base font-bold text-slate-600 text-center">🎬 화면 녹화</p>
+                                        <button onClick={startScreenRecording}
+                                            className="w-full bg-red-500 text-white py-2 rounded-full text-lg font-bold active:scale-95">
+                                            🔴 녹화 시작
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                                <ToolBtn t="pen" icon="PenTool" label="펜" />
+                                <ToolBtn t="eraser" icon="Eraser" label="지우개" />
+                                <ToolBtn t="select" icon="MousePointer2" label="선택" />
+                                <ToolBtn t="circle" icon="Circle" label="원" />
+                                <ToolBtn t="square" icon="Square" label="네모" />
+                                <ToolBtn t="triangle" icon="Triangle" label="세모" />
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-2">
+                                {COLORS.map(c => (
+                                    <button key={c} onClick={() => {
+                                        setColor(c);
+                                        if (selectedId) setShapes(prev => prev.map(s => s.id === selectedId ? { ...s, color: c } : s));
+                                    }}
+                                        className={`h-12 rounded-xl border-4 ${color === c ? 'border-blue-500 scale-110 shadow' : 'border-gray-200'}`}
+                                        style={{ backgroundColor: c }} />
+                                ))}
+                            </div>
+
+                            <div className="flex flex-col gap-1">
+                                <span className="text-xl font-bold text-slate-500 text-center">도형 크기</span>
+                                <div className="flex gap-2">
+                                    {[60, 120, 200].map(sz => (
+                                        <button key={sz} onClick={() => { shapeSize.current = sz; }}
+                                            className="flex-1 py-2 rounded-full border-4 border-slate-200 text-xl font-bold text-slate-600 active:scale-95">
+                                            {sz === 60 ? '소' : sz === 120 ? '중' : '대'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {selectedId && (
+                                <div className="bg-blue-50 rounded-2xl p-3 border-4 border-blue-200 flex flex-col gap-2">
+                                    <span className="text-xl font-bold text-blue-700 text-center">✅ 선택됨!</span>
+                                    <button onClick={deleteSelected} className="w-full py-2 bg-red-100 border-4 border-red-300 rounded-xl text-xl font-bold text-red-700 active:scale-95">🗑 삭제</button>
+                                </div>
+                            )}
+
+                            <div className="mt-auto flex flex-col gap-2">
+                                <button onClick={() => { setTutorialStep(1); setShowTutorial(true); }}
+                                    className="w-full bg-purple-100 text-purple-700 border-4 border-purple-200 py-2 rounded-full text-lg font-bold active:scale-95">
+                                    📖 도움말 다시 보기
+                                </button>
+                                <button onClick={clearAll} className="w-full bg-slate-200 text-slate-700 py-3 rounded-full text-xl font-bold active:scale-95">
+                                    <Icon name="Trash2" size={24} className="inline mr-1" /> 전체 지우기
+                                </button>
+                                <input type="file" accept="image/*" capture="environment" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
+                                <button onClick={() => fileInputRef.current.click()} className="w-full bg-teal-500 text-white py-3 rounded-full text-xl font-bold active:scale-95">
+                                    📷 사진 올리기
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* 도화지 */}
+                        <div className="flex-1 flex flex-col gap-4">
+                            <div className="bg-white/80 px-6 py-3 rounded-[1.5rem] border-4 border-slate-200 flex items-center justify-between shadow-sm">
+                                <h2 className="text-3xl font-bold text-slate-800">나만의 업사이클링 설계도 🎨</h2>
+                                {isScreenRecording && (
+                                    <div className="flex items-center gap-2 bg-red-100 px-4 py-2 rounded-full">
+                                        <div className="w-4 h-4 bg-red-500 rounded-full animate-pulse"></div>
+                                        <span className="text-xl font-bold text-red-700">녹화 중!</span>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex-1 bg-white rounded-[2rem] shadow-2xl border-[10px] border-slate-300 relative overflow-hidden">
+                                <canvas ref={bgCanvasRef} width={1200} height={800} className="hidden" />
+                                <canvas
+                                    ref={canvasRef}
+                                    width={1200}
+                                    height={800}
+                                    className={`w-full h-full touch-none ${tool === 'select' ? 'cursor-default' : 'cursor-crosshair'}`}
+                                    onPointerDown={onPointerDown}
+                                    onPointerMove={onPointerMove}
+                                    onPointerUp={onPointerUp}
+                                    onPointerLeave={onPointerUp}
+                                />
+                            </div>
+
+                            <div className="bg-yellow-50 border-4 border-yellow-300 rounded-2xl p-3 text-center">
+                                <p className="text-2xl font-bold text-yellow-800">💡 그리면서 말해봐요! "○○로 □□를 만들 거예요!"</p>
+                            </div>
+
+                            <button onClick={submit} className="w-full bg-blue-500 text-white py-5 rounded-full text-3xl font-bold shadow-xl hover:bg-blue-600 active:scale-95">
+                                설계도 완성! 다음 단계로 🚀
+                            </button>
+                        </div>
+                    </div>
+                );
+            };
+
+            // ============================================================
+            // 헷갈리는 분리수거 퀴즈 컴포넌트
+            // ============================================================
+            const TrickyQuiz = ({ onComplete, onHelpUsed, speak, playEffect }) => {
+                const [idx, setIdx] = useState(0);
+                const [results, setResults] = useState([]);
+                const [showHint, setShowHint] = useState(false);
+                const [feedback, setFeedback] = useState(null); // {correct, message}
+                const [helpThis, setHelpThis] = useState(false);
+
+                const current = TRICKY_QUIZZES[idx];
+
+                const handleHint = () => {
+                    setShowHint(true);
+                    setHelpThis(true);
+                    onHelpUsed();
+                    speak(current.hint);
+                };
+
+                const handleAnswer = (binId) => {
+                    const correct = binId === current.answer;
+                    if (correct) {
+                        playEffect('correct');
+                        triggerCelebration('normal');
+                        speak(`정답이에요! ${current.hint}`);
+                        setFeedback({ correct: true, message: '정답이에요! 🎉' });
+                        // 정답일 때만 다음 문제로
+                        setTimeout(() => {
+                            const newResults = [...results, { id: current.id, correct: true, helpUsed: helpThis }];
+                            setResults(newResults);
+                            if (idx + 1 < TRICKY_QUIZZES.length) {
+                                setIdx(idx + 1);
+                                setShowHint(false);
+                                setHelpThis(false);
+                                setFeedback(null);
+                            } else {
+                                onComplete(newResults);
+                            }
+                        }, 2500);
+                    } else {
+                        playEffect('wrong');
+                        speak('아쉬워요! 힌트를 보고 다시 생각해봐요.');
+                        setFeedback({ correct: false, message: '아쉬워요! 다시 골라봐요.' });
+                        // 틀린 경우: 힌트 자동 표시 + 다시 풀기 (idx 유지)
+                        setTimeout(() => {
+                            setFeedback(null);
+                            setShowHint(true);
+                            setHelpThis(true);
+                            // 도움받음으로 카운트 (틀려서 힌트 자동표시)
+                            if (!helpThis) onHelpUsed();
+                        }, 2000);
+                    }
+                };
+
+                return (
+                    <div className="bg-white p-8 rounded-[3rem] shadow-2xl w-full max-w-5xl flex flex-col gap-5 border-8 border-orange-300 relative">
+
+                        <div className="text-center">
+                            <h2 className="text-5xl font-black text-orange-800 mb-2">🤔 헷갈리는 분리수거 퀴즈!</h2>
+                            <p className="text-2xl font-bold text-orange-600 bg-orange-50 px-6 py-2 rounded-full inline-block">
+                                ({idx + 1} / {TRICKY_QUIZZES.length})
+                            </p>
+                        </div>
+
+                        {/* 문제 */}
+                        <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border-4 border-orange-300 rounded-3xl p-8 text-center">
+                            <div className="flex justify-center mb-3">
+                                <TrashSVG type={current.svgType} size={140} />
+                            </div>
+                            <p className="text-4xl font-bold text-slate-800 break-keep leading-tight">{current.question}</p>
+                        </div>
+
+                        {/* 도움받기/힌트 영역 */}
+                        <div className="bg-blue-50 border-4 border-blue-300 rounded-3xl p-5">
+                            {!showHint ? (
+                                <button onClick={handleHint}
+                                    className="w-full bg-blue-500 text-white py-4 rounded-full text-2xl font-bold hover:bg-blue-600 active:scale-95 flex items-center justify-center gap-3">
+                                    <Icon name="HelpCircle" size={32} /> 💡 모르겠어요! 힌트 보기
+                                </button>
+                            ) : (
+                                <div className="flex flex-col gap-3">
+                                    <p className="text-2xl font-bold text-blue-900 leading-relaxed break-keep">💡 {current.hint}</p>
+                                    <button onClick={() => speak(current.hint)}
+                                        className="bg-blue-300 text-blue-900 py-2 rounded-full text-xl font-bold hover:bg-blue-400 active:scale-95 flex items-center justify-center gap-2">
+                                        <Icon name="Volume2" size={24} /> 다시 들어볼게요
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* 답 고르기 */}
+                        <div>
+                            <p className="text-2xl font-bold text-slate-700 mb-3 text-center">👇 알맞은 곳을 골라주세요!</p>
+                            <div className="grid grid-cols-3 gap-3">
+                                {QUIZ_BINS_FOR_CHOICE.map(bin => (
+                                    <button key={bin.id} onClick={() => handleAnswer(bin.id)}
+                                        disabled={feedback !== null}
+                                        className="p-4 rounded-3xl border-4 border-slate-300 bg-white hover:bg-orange-50 hover:border-orange-400 active:scale-95 flex flex-col items-center justify-center disabled:opacity-50">
+                                        <span className="text-[3.5rem] leading-none">{bin.icon}</span>
+                                        <span className="text-2xl font-bold text-slate-700 mt-1">{bin.name}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* 피드백 (큰 글씨 + 자연 줄바꿈) */}
+                        <AnimatePresence>
+                            {feedback && (
+                                <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+                                    className="absolute inset-0 bg-black/60 z-50 flex items-center justify-center rounded-[3rem] p-8">
+                                    <div className={`bg-white px-12 py-10 rounded-[3rem] border-8 ${feedback.correct ? 'border-green-400' : 'border-orange-400'} max-w-4xl text-center shadow-2xl flex flex-col gap-5`}>
+                                        <div className="text-[8rem] leading-none">{feedback.correct ? '🎉' : '🤔'}</div>
+                                        <h3 className={`text-6xl font-black ${feedback.correct ? 'text-green-600' : 'text-orange-500'} leading-tight`}>{feedback.message}</h3>
+                                        {feedback.correct ? (
+                                            <p className="text-3xl font-bold text-slate-700 leading-relaxed break-keep">
+                                                {current.hint}
+                                            </p>
+                                        ) : (
+                                            <p className="text-3xl font-bold text-slate-600 leading-relaxed break-keep">
+                                                힌트를 보고<br />한 번 더 생각해봐요!
+                                            </p>
+                                        )}
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+                );
+            };
+
+            // ============================================================
+            // 설계도 영상 재생 + 자기평가 컴포넌트
+            // ============================================================
+            const BlueprintReviewComponent = ({ videoData, imageData, stars, setStars, onNext, speak, playEffect }) => {
+                const hasVideo = !!videoData;
+
+                return (
+                    <div className="bg-white p-8 rounded-[3rem] shadow-2xl w-full max-w-5xl flex flex-col gap-5 border-8 border-purple-300">
+
+                        <div className="text-center">
+                            <h2 className="text-5xl font-black text-purple-800 mb-2">🎬 내 설계도 다시 보기!</h2>
+                            <p className="text-2xl font-bold text-purple-600 bg-purple-50 px-6 py-2 rounded-full inline-block">
+                                내가 무엇을 만들 건지 잘 설명했나요? 다시 보고 별점을 줘봐요!
+                            </p>
+                        </div>
+
+                        {/* 영상 또는 이미지 */}
+                        <div className="bg-slate-100 rounded-3xl border-8 border-slate-300 overflow-hidden">
+                            {hasVideo ? (
+                                <video
+                                    src={videoData}
+                                    controls
+                                    className="w-full max-h-[400px] bg-black"
+                                />
+                            ) : imageData ? (
+                                <div className="relative">
+                                    <img src={imageData} alt="설계도" className="w-full max-h-[400px] object-contain bg-white" />
+                                    <div className="absolute top-3 left-3 bg-yellow-100 border-2 border-yellow-400 px-4 py-2 rounded-full text-lg font-bold text-yellow-800">
+                                        💡 영상이 없어서 그림만 보여드려요
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="p-12 text-center text-2xl font-bold text-slate-400">
+                                    설계도가 없어요. 다음으로 넘어가요!
+                                </div>
+                            )}
+                        </div>
+
+                        {/* 자기평가 안내 + 별점 */}
+                        <div className="bg-yellow-50 border-4 border-yellow-300 rounded-3xl p-5 flex flex-col gap-4">
+                            <p className="text-3xl font-bold text-yellow-900 text-center">⭐ 내 설계도, 어땠어요?</p>
+                            <p className="text-xl font-bold text-yellow-700 text-center leading-relaxed">
+                                "무엇을 만들 건지" 잘 말했나요?<br />
+                                그림을 자세히 그렸나요?
+                            </p>
+                            <div className="flex gap-3 justify-center">
+                                {[1, 2, 3, 4, 5].map(n => (
+                                    <button key={n} onClick={() => {
+                                        setStars(n);
+                                        playEffect('correct');
+                                        if (n >= 4) triggerCelebration('normal');
+                                    }} className="star-btn">
+                                        <Icon name="Star" size={60}
+                                            className={stars >= n ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300 fill-gray-100'} />
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* 다음 버튼 */}
+                        <button onClick={onNext}
+                            className="w-full bg-purple-500 text-white py-5 rounded-full text-3xl font-bold shadow-lg hover:bg-purple-600 active:scale-95">
+                            다음으로 →
+                        </button>
+                    </div>
+                );
+            };
+
+            // 쓰레기 표시 헬퍼: svgType이 있으면 SVG, 없으면 이모지
+            const TrashDisplay = ({ trash, size = 100 }) => {
+                if (trash.svgType) return <TrashSVG type={trash.svgType} size={size} />;
+                return <span style={{ fontSize: `${size * 0.85}px`, lineHeight: 1 }}>{trash.icon}</span>;
+            };
+
+            // ============================================================
+            // 마이크 권한 게이트 화면
+            // ============================================================
+            if (showMicGate) {
+                return (
+                    <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-emerald-100 to-teal-100 p-8">
+                        <div className="bg-white rounded-[3rem] shadow-2xl border-8 border-emerald-300 max-w-3xl p-12 flex flex-col items-center gap-8">
+                            <div className="text-[10rem] leading-none">🎤</div>
+                            <h1 className="text-6xl font-bold text-emerald-800 text-center">분리수거 대장</h1>
+                            <p className="text-3xl font-bold text-slate-700 text-center leading-relaxed bg-emerald-50 p-6 rounded-2xl">
+                                활동 중에 <span className="text-red-500">목소리로 녹음</span>을 해요!<br />
+                                마이크 사용을 <span className="text-emerald-600 underline">허락</span>해주세요.
+                            </p>
+                            <p className="text-2xl font-bold text-slate-500 text-center">
+                                ※ 다시는 묻지 않아요!<br />
+                                ※ 마이크가 없어도 키보드로 진행할 수 있어요.
+                            </p>
+                            <button onClick={requestMicPermission}
+                                className="w-full bg-emerald-500 text-white py-6 rounded-full text-4xl font-bold hover:bg-emerald-600 active:scale-95 shadow-lg">
+                                🎤 마이크 허용하고 시작하기!
+                            </button>
+                            <button onClick={() => setShowMicGate(false)}
+                                className="text-2xl text-slate-400 underline hover:text-slate-600">
+                                마이크 없이 진행할래요
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (isLoading) {
+                return <div className="w-screen h-screen flex items-center justify-center bg-emerald-50 text-4xl font-bold text-green-700">잠시만 기다려주세요... 🌱</div>;
+            }
+
+            return (
+                <div className="w-screen h-screen flex items-center justify-center overflow-hidden bg-gray-900">
+                    <div
+                        style={{
+                            width: '1920px',
+                            height: '1080px',
+                            transform: `scale(${scale})`,
+                            transformOrigin: 'center center'
+                        }}
+                        className="relative bg-emerald-50 overflow-hidden flex flex-col shrink-0 shadow-2xl"
+                    >
+
+                        {/* Header */}
+                        <header className="h-24 bg-white shadow-sm flex items-center justify-between px-8 z-50 shrink-0 border-b-4 border-green-200">
+                            <div className="text-3xl font-bold text-green-800">🌍 분리수거 대장</div>
+                            <div className="flex items-center gap-6">
+                                {collectedStickers.length > 0 && (
+                                    <div className="bg-pink-100 px-4 py-2 rounded-full flex items-center gap-2 border-4 border-pink-300">
+                                        <span className="text-2xl font-bold text-pink-700">🎁 스티커 {collectedStickers.length}개</span>
+                                    </div>
+                                )}
+                                {studentName && <span className="bg-green-100 text-green-800 px-6 py-2 text-2xl rounded-full font-bold">{studentName} 대장님</span>}
+                                <button
+                                    onClick={handleToggleSpeaker}
+                                    className={`p-4 rounded-full transition-all ${speakerEnabled ? 'bg-blue-500 text-white shadow-lg' : 'bg-gray-200 text-gray-500'}`}
+                                    title={speakerEnabled ? '스피커 켜짐 (꺼지게 누르기)' : '스피커 꺼짐 (켜기)'}
+                                >
+                                    {speakerEnabled ? <Icon name="Volume2" size={32} /> : <Icon name="VolumeX" size={32} />}
+                                </button>
+                            </div>
+                        </header>
+
+                        <main className="flex-1 relative overflow-hidden">
+                            <AnimatePresence mode="wait">
+
+                                {/* STEP 0: Intro */}
+                                {step === 0 && (
+                                    <motion.div key="step0" className="absolute inset-0 flex flex-col items-center justify-center p-6 gap-8 bg-gradient-to-b from-green-50 to-green-100"
+                                        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
+                                        <div className="text-[12rem] drop-shadow-xl animate-bounce leading-none">🌱</div>
+                                        <div className="glass-panel p-12 rounded-[3rem] w-full max-w-3xl flex flex-col gap-8 text-center">
+                                            <h2 className="text-5xl font-bold text-green-800">환영해요!</h2>
+                                            <p className="text-4xl text-gray-800 font-bold bg-white/60 p-6 rounded-2xl leading-snug">
+                                                이름을 골라서<br />멋진 분리수거 대장이 되어볼까요?
+                                            </p>
+                                            <select
+                                                className="w-full text-3xl p-6 rounded-2xl border-4 border-green-200 bg-white font-bold text-green-900 focus:outline-none focus:border-green-500 cursor-pointer"
+                                                value={studentName}
+                                                onChange={e => setStudentName(e.target.value)}
+                                            >
+                                                <option value="" disabled>이름을 골라주세요 👇</option>
+                                                {students.map(name => <option key={name} value={name}>{name}</option>)}
+                                            </select>
+                                            <p className="text-2xl text-gray-500 font-bold">
+                                                💡 화면 위에 <Icon name="VolumeX" size={28} className="inline" /> 스피커 버튼을 누르면<br />소리로 안내를 들을 수 있어요!
+                                            </p>
+                                            <button
+                                                onClick={() => setStep(1)}
+                                                disabled={!studentName}
+                                                className="mt-4 w-full bg-green-500 text-white text-4xl font-bold py-6 rounded-full shadow-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-green-600 active:scale-95"
+                                            >
+                                                시작하기 🚀
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {/* STEP 1: Pre-record */}
+                                {step === 1 && (
+                                    <motion.div key="step1" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-blue-50 to-indigo-50 overflow-y-auto hide-scrollbar"
+                                        initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }}>
+                                        <div className="bg-white px-10 py-5 rounded-full shadow-sm border-4 border-blue-200 mb-6 text-center">
+                                            <p className="text-3xl font-bold text-blue-700">🎤 분리수거가 뭔지 아는 만큼 말해봐요!</p>
+                                        </div>
+                                        <RecorderComponent
+                                            defaultText="분리수거란 무엇일까요?"
+                                            helpKey="pre"
+                                            exampleList={[
+                                                "분리수거는 종이, 플라스틱, 캔, 병, 비닐을 나누어 버리는 것이에요.",
+                                                "분리수거를 하면 쓰레기가 줄어들어요.",
+                                                "재활용할 수 있는 것들을 따로 모아서 버려요."
+                                            ]}
+                                            onComplete={(data) => {
+                                                setPreRecordData(data);
+                                                startCollecting();
+                                            }}
+                                        />
+                                    </motion.div>
+                                )}
+
+                                {/* STEP 2: Collect Trash */}
+                                {step === 2 && (
+                                    <motion.div key="step2" className="absolute inset-0 bg-gradient-to-b from-sky-200 to-blue-400 overflow-hidden"
+                                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+
+                                        <div className="absolute top-10 left-0 right-0 flex flex-col items-center pointer-events-none z-10 gap-6">
+                                            <div className="bg-white/90 px-10 py-5 rounded-full text-4xl font-bold text-blue-800 shadow-xl border-4 border-white">
+                                                바다 쓰레기 줍기 ({problems.length - seaTrash.length}/{problems.length})
+                                            </div>
+                                            <div className="bg-blue-800 text-white px-8 py-4 rounded-full text-3xl font-bold shadow-md animate-pulse">
+                                                👆 바다에 떠다니는 쓰레기를 모두 손으로 콕콕 눌러주세요!
+                                            </div>
+                                            <div className="bg-yellow-100 px-6 py-3 rounded-full text-2xl font-bold text-yellow-800 border-4 border-yellow-300">
+                                                💡 쓰레기를 줍는다는 건? 바다에서 쓰레기를 건져 올린다는 뜻이에요!
+                                            </div>
+                                        </div>
+
+                                        {seaTrash.map(t => (
+                                            <motion.button
+                                                key={t.uid}
+                                                onClick={() => handleCollect(t)}
+                                                className="absolute hover:scale-110 active:scale-90 flex flex-col items-center drop-shadow-2xl"
+                                                style={{ left: `${t.x}%`, top: `${t.y}%` }}
+                                                initial={{ scale: 0 }} animate={{ scale: 1, y: [0, -10, 0] }}
+                                                transition={{ y: { repeat: Infinity, duration: 2, delay: Math.random() } }}
+                                            >
+                                                <div className="mb-2 bg-white/80 rounded-3xl p-3 shadow-xl">
+                                                    <TrashDisplay trash={t} size={120} />
+                                                </div>
+                                                <div className="bg-white/95 px-6 py-2 rounded-2xl text-2xl font-bold text-gray-800 border-4 border-blue-200">
+                                                    {t.name}
+                                                </div>
+                                            </motion.button>
+                                        ))}
+
+                                        {seaTrash.length === 0 && !popupTrash && (
+                                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-20">
+                                                <motion.button
+                                                    onClick={handleNextStep}
+                                                    className="bg-yellow-400 text-yellow-900 px-16 py-8 rounded-full text-5xl font-bold shadow-2xl border-8 border-white animate-bounce"
+                                                    initial={{ scale: 0 }} animate={{ scale: 1 }}
+                                                >
+                                                    🚀 분리수거 하러 가기!
+                                                </motion.button>
+                                            </div>
+                                        )}
+
+                                        <AnimatePresence>
+                                            {popupTrash && (
+                                                <motion.div className="absolute inset-0 flex items-center justify-center bg-black/60 z-50 p-6"
+                                                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                                                    <motion.div className="bg-white p-12 rounded-[4rem] shadow-2xl max-w-4xl w-full text-center flex flex-col items-center gap-6 border-8 border-blue-400"
+                                                        initial={{ scale: 0.8, y: 50 }} animate={{ scale: 1, y: 0 }}>
+                                                        <div className="bg-blue-50 w-64 h-64 rounded-full flex items-center justify-center border-8 border-blue-200">
+                                                            <TrashDisplay trash={popupTrash} size={180} />
+                                                        </div>
+                                                        <h3 className="text-5xl font-bold text-blue-900">{popupTrash.name}</h3>
+                                                        <div className="bg-green-100 text-green-800 px-6 py-2 rounded-full text-2xl font-bold border-4 border-green-300">
+                                                            🌟 이건 어떻게 분류할까요?
+                                                        </div>
+                                                        <p className="text-4xl font-bold text-gray-700 leading-relaxed bg-gray-50 p-8 rounded-3xl w-full text-center whitespace-pre-line break-keep">
+                                                            {popupTrash.fact}
+                                                        </p>
+                                                        <button
+                                                            onClick={closePopupAndContinue}
+                                                            className="w-full bg-blue-500 text-white text-4xl font-bold py-6 rounded-full mt-4 hover:bg-blue-600 active:scale-95 shadow-lg"
+                                                        >
+                                                            🎒 주머니에 넣기
+                                                        </button>
+                                                    </motion.div>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </motion.div>
+                                )}
+
+                                {/* STEP 3: Sort Trash */}
+                                {step === 3 && (
+                                    <motion.div key="step3" className="absolute inset-0 flex flex-col bg-emerald-50 p-8"
+                                        initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.1 }}>
+
+                                        <div className="flex flex-col items-center mb-6 gap-3">
+                                            <h2 className="text-5xl font-bold text-emerald-800">알맞은 곳에 쏙쏙! 분리수거</h2>
+                                            <p className="text-3xl font-bold text-emerald-700 bg-white px-8 py-3 rounded-full shadow-sm border-4 border-emerald-200">
+                                                👆 쓰레기를 누르고, 알맞은 쓰레기통을 골라주세요!
+                                            </p>
+                                            <div className="flex gap-2 flex-wrap justify-center">
+                                                <span className="text-lg font-bold text-slate-700 bg-blue-100 px-3 py-2 rounded-full border-2 border-blue-300">📦 종이류</span>
+                                                <span className="text-lg font-bold text-slate-700 bg-yellow-100 px-3 py-2 rounded-full border-2 border-yellow-300">🥤 플라스틱류</span>
+                                                <span className="text-lg font-bold text-slate-700 bg-red-100 px-3 py-2 rounded-full border-2 border-red-300">🫙 병류</span>
+                                                <span className="text-lg font-bold text-slate-700 bg-gray-100 px-3 py-2 rounded-full border-2 border-gray-300">🥫 캔류</span>
+                                                <span className="text-lg font-bold text-slate-700 bg-slate-100 px-3 py-2 rounded-full border-2 border-slate-300">🛍️ 비닐류</span>
+                                                <span className="text-lg font-bold text-slate-700 bg-stone-100 px-3 py-2 rounded-full border-2 border-stone-300">🗑️ 일반쓰레기</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex-1 flex flex-row gap-8 min-h-0">
+                                            <div className="w-[40%] bg-white rounded-[3rem] p-8 shadow-inner border-4 border-emerald-100 flex flex-wrap content-start justify-center gap-6 overflow-y-auto hide-scrollbar">
+                                                {collectedTrash.map(t => (
+                                                    <button
+                                                        key={t.uid}
+                                                        onClick={() => setSelectedTrashForSort(t)}
+                                                        className="bg-gray-50 rounded-3xl w-44 flex flex-col items-center justify-center shadow-md border-4 border-gray-200 hover:scale-105 active:scale-95 p-3"
+                                                    >
+                                                        <TrashDisplay trash={t} size={100} />
+                                                        <div className="text-xl font-bold text-gray-700 mt-2 text-center break-keep">{t.name}</div>
+                                                    </button>
+                                                ))}
+                                                {collectedTrash.length === 0 && (
+                                                    <div className="w-full h-full flex flex-col items-center justify-center text-4xl font-bold text-gray-400">
+                                                        <Icon name="CheckCircle" size={100} className="mb-6 text-green-300" />
+                                                        모두 분리수거 했어요!
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="flex-1 grid grid-cols-3 gap-5 content-center">
+                                                {BIN_TYPES.map(bin => (
+                                                    <div key={bin.id} className={`rounded-[2.5rem] border-8 p-5 flex flex-col items-center justify-center ${bin.color} opacity-90 shadow-sm`}>
+                                                        <div className="text-[4.5rem] leading-none mb-2">{bin.icon}</div>
+                                                        <div className="text-2xl font-bold">{bin.name}</div>
+                                                        <div className="text-xl mt-2 font-bold opacity-70 bg-white/50 px-3 py-1 rounded-full">
+                                                            {sortedTrash.filter(t => t.type === bin.id).length}개
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {selectedTrashForSort && (
+                                            <div className="absolute inset-0 bg-black/60 z-50 flex items-center justify-center p-8" onClick={() => setSelectedTrashForSort(null)}>
+                                                <div className="bg-white p-12 rounded-[4rem] shadow-2xl flex flex-col items-center border-8 border-emerald-300 w-full max-w-5xl" onClick={e => e.stopPropagation()}>
+                                                    <h3 className="text-5xl font-bold text-gray-800 mb-6 text-center break-keep">어디에 분리수거 할까요?</h3>
+                                                    <div className="flex flex-col items-center mb-8 bg-gray-50 px-16 py-6 rounded-[3rem] border-4 border-gray-200 w-full">
+                                                        <div className="drop-shadow-xl animate-bounce">
+                                                            <TrashDisplay trash={selectedTrashForSort} size={140} />
+                                                        </div>
+                                                        <div className="text-3xl font-bold text-gray-700 bg-white px-8 py-2 rounded-full border-4 border-gray-300 mt-3">
+                                                            {selectedTrashForSort.name}
+                                                        </div>
+                                                    </div>
+                                                    <div className="grid grid-cols-3 gap-4 w-full">
+                                                        {BIN_TYPES.map(bin => (
+                                                            <button
+                                                                key={bin.id}
+                                                                onClick={() => handleSort(selectedTrashForSort, bin.id)}
+                                                                className={`p-5 rounded-3xl border-4 flex flex-col items-center justify-center ${bin.color} active:scale-90 shadow-md`}
+                                                            >
+                                                                <span className="text-[4.5rem] mb-2 leading-none">{bin.icon}</span>
+                                                                <span className="text-2xl font-bold whitespace-nowrap">{bin.name}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {collectedTrash.length === 0 && (
+                                            <motion.button
+                                                onClick={handleNextStep}
+                                                className="absolute bottom-12 left-1/2 -translate-x-1/2 bg-yellow-400 text-yellow-900 px-20 py-8 rounded-full text-5xl font-bold shadow-2xl border-8 border-white animate-bounce z-40 whitespace-nowrap"
+                                                initial={{ scale: 0 }} animate={{ scale: 1 }}
+                                            >
+                                                🪄 마법 센터로 가기!
+                                            </motion.button>
+                                        )}
+
+                                        <AnimatePresence>
+                                            {feedbackPopup && (
+                                                <motion.div className="absolute inset-0 bg-black/50 z-[60] flex items-center justify-center p-8" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                                                    <motion.div className={`bg-white px-16 py-12 rounded-[3rem] shadow-2xl flex flex-col items-center gap-6 border-8 ${feedbackPopup.isCorrect ? 'border-green-400' : 'border-orange-400'} max-w-4xl`}
+                                                        initial={{ scale: 0.5, y: 50 }} animate={{ scale: 1, y: 0 }}>
+                                                        <span className="text-[10rem] leading-none mb-2">{feedbackPopup.isCorrect ? '🌟' : '🤔'}</span>
+                                                        <h3 className={`text-6xl font-black ${feedbackPopup.isCorrect ? 'text-green-600' : 'text-orange-500'}`}>
+                                                            {feedbackPopup.isCorrect ? '참 잘했어요!' : '한번 더 해봐요!'}
+                                                        </h3>
+                                                        <p className="text-4xl font-bold text-slate-700 whitespace-pre-line text-center leading-[1.4] break-keep">{feedbackPopup.message}</p>
+                                                    </motion.div>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </motion.div>
+                                )}
+
+                                {/* STEP 4: 헷갈리는 분리수거 퀴즈 (NEW!) */}
+                                {step === 4 && (
+                                    <motion.div key="step4" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-orange-50 to-amber-50 overflow-y-auto hide-scrollbar"
+                                        initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.05 }}>
+                                        <TrickyQuiz
+                                            onComplete={(results) => {
+                                                setQuizResults(results);
+                                                handleNextStep();
+                                            }}
+                                            onHelpUsed={() => setHelpUsedCount(prev => ({ ...prev, quiz: (prev.quiz || 0) + 1 }))}
+                                            speak={speak}
+                                            playEffect={playEffect}
+                                        />
+                                    </motion.div>
+                                )}
+
+                                {/* STEP 5: Matching Game (이전 STEP 4) */}
+                                {step === 5 && (
+                                    <motion.div key="step5" className="absolute inset-0 flex flex-col items-center justify-center p-10 bg-gradient-to-b from-indigo-50 to-purple-50"
+                                        initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.05 }}>
+                                        <div className="bg-white p-10 rounded-[3rem] shadow-2xl w-full max-w-[1500px] h-full max-h-[950px] flex flex-col border-8 border-purple-300 relative">
+
+                                            <div className="text-center mb-6 shrink-0">
+                                                <h2 className="text-6xl font-black text-purple-800 mb-3">🪄 마법 센터: 쓰레기의 변신! ♻️</h2>
+                                                <p className="text-3xl font-bold text-slate-700 bg-purple-50 px-8 py-3 rounded-full inline-block">분리수거한 쓰레기는 어떤 물건으로 변할까요?</p>
+                                            </div>
+
+                                            <div className="flex flex-1 gap-12 justify-between items-center w-full px-12 relative min-h-0">
+
+                                                <div className="flex flex-col gap-6 flex-1 h-full justify-center">
+                                                    <h3 className="text-3xl font-bold text-blue-700 text-center">🗑️ 쓰레기</h3>
+                                                    {MATCHING_PAIRS.map(pair => (
+                                                        <motion.button
+                                                            key={`trash-${pair.id}`}
+                                                            onClick={() => {
+                                                                if (matchedPairs.includes(pair.id)) return;
+                                                                setSelectedMatchingTrash(selectedMatchingTrash === pair.id ? null : pair.id);
+                                                            }}
+                                                            className={`p-5 rounded-3xl border-8 flex flex-col items-center justify-center bg-white relative ${matchedPairs.includes(pair.id) ? 'border-gray-200 opacity-50' : selectedMatchingTrash === pair.id ? 'border-purple-500 scale-110 z-10' : 'border-blue-200 hover:border-blue-400'}`}
+                                                        >
+                                                            <span className="text-[5rem] leading-none">{pair.trashIcon}</span>
+                                                            <span className="text-3xl font-bold text-slate-700 mt-2">{pair.trashName}</span>
+                                                            {matchedPairs.includes(pair.id) && (
+                                                                <div className="absolute inset-0 bg-white/50 rounded-2xl flex items-center justify-center">
+                                                                    <Icon name="Check" size={80} className="text-green-500" />
+                                                                </div>
+                                                            )}
+                                                        </motion.button>
+                                                    ))}
+                                                </div>
+
+                                                <div className="flex-[0.5] h-full flex flex-col justify-center items-center opacity-30 pointer-events-none">
+                                                    <Icon name="ArrowRight" size={100} className="text-purple-300" />
+                                                </div>
+
+                                                <div className="flex flex-col gap-6 flex-1 h-full justify-center">
+                                                    <h3 className="text-3xl font-bold text-emerald-700 text-center">✨ 변신!</h3>
+                                                    {[MATCHING_PAIRS[1], MATCHING_PAIRS[2], MATCHING_PAIRS[0]].map(pair => (
+                                                        <motion.button
+                                                            key={`upcycle-${pair.id}`}
+                                                            onClick={() => {
+                                                                if (matchedPairs.includes(pair.id)) return;
+                                                                if (selectedMatchingTrash) {
+                                                                    if (selectedMatchingTrash === pair.id) {
+                                                                        playEffect('correct');
+                                                                        triggerCelebration('normal');
+                                                                        setMatchedPairs(prev => [...prev, pair.id]);
+                                                                        setSelectedMatchingTrash(null);
+                                                                        setMatchingPopup(pair);
+                                                                    } else {
+                                                                        playEffect('wrong');
+                                                                        setSelectedMatchingTrash(null);
+                                                                        setMatchingWrongPopup(true);
+                                                                        setTimeout(() => setMatchingWrongPopup(false), 2000);
+                                                                    }
+                                                                }
+                                                            }}
+                                                            className={`p-5 rounded-3xl border-8 flex flex-col items-center justify-center bg-white relative ${matchedPairs.includes(pair.id) ? 'border-gray-200 opacity-50' : selectedMatchingTrash ? 'border-emerald-300 hover:border-emerald-500 animate-pulse' : 'border-slate-200'}`}
+                                                        >
+                                                            <span className="text-[5rem] leading-none">{pair.upcycleIcon}</span>
+                                                            <span className="text-3xl font-bold text-slate-700 mt-2">{pair.upcycleName}</span>
+                                                            {matchedPairs.includes(pair.id) && (
+                                                                <div className="absolute inset-0 bg-white/50 rounded-2xl flex items-center justify-center">
+                                                                    <Icon name="Check" size={80} className="text-green-500" />
+                                                                </div>
+                                                            )}
+                                                        </motion.button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <AnimatePresence>
+                                                {matchingPopup && (
+                                                    <motion.div className="absolute inset-0 bg-black/60 z-50 flex items-center justify-center rounded-[2.5rem] p-8"
+                                                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                                                        <motion.div className="bg-white p-10 rounded-[3rem] max-w-4xl flex flex-col items-center gap-6 border-8 border-yellow-400 text-center shadow-2xl"
+                                                            initial={{ scale: 0.5, y: 50 }} animate={{ scale: 1, y: 0 }}>
+                                                            <div className="flex items-center gap-6 text-[6rem] bg-yellow-50 px-10 py-4 rounded-[3rem]">
+                                                                <span>{matchingPopup.trashIcon}</span>
+                                                                <Icon name="ArrowRight" size={70} className="text-yellow-500" />
+                                                                <span>{matchingPopup.upcycleIcon}</span>
+                                                            </div>
+                                                            <h3 className="text-5xl font-black text-slate-800">우와! 정답이에요! 🎉</h3>
+                                                            <p className="text-4xl font-bold text-blue-700 bg-blue-50 px-10 py-6 rounded-[2rem] whitespace-pre-line leading-[1.4]">{matchingPopup.message}</p>
+                                                            <button onClick={() => setMatchingPopup(null)}
+                                                                className="bg-yellow-500 text-white text-3xl font-bold px-16 py-5 rounded-full hover:bg-yellow-600 active:scale-95 mt-4">
+                                                                계속하기
+                                                            </button>
+                                                        </motion.div>
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
+
+                                            <AnimatePresence>
+                                                {matchingWrongPopup && (
+                                                    <motion.div className="absolute inset-0 bg-black/60 z-[60] flex items-center justify-center rounded-[2.5rem]"
+                                                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                                                        <motion.div className="bg-white p-10 rounded-[3rem] max-w-3xl flex flex-col items-center gap-6 border-8 border-orange-400 text-center shadow-2xl"
+                                                            initial={{ scale: 0.5, y: 50 }} animate={{ scale: 1, y: 0 }}>
+                                                            <div className="text-[8rem] animate-bounce">🤔</div>
+                                                            <h3 className="text-5xl font-black text-orange-500">짝이 아니에요!</h3>
+                                                            <p className="text-3xl font-bold text-slate-700">어떤 물건으로 변할지 다시 생각해봐요!</p>
+                                                        </motion.div>
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
+
+                                            {matchedPairs.length === MATCHING_PAIRS.length && !matchingPopup && (
+                                                <motion.button
+                                                    onClick={handleNextStep}
+                                                    className="absolute bottom-10 left-1/2 -translate-x-1/2 bg-purple-600 text-white text-4xl font-bold px-16 py-6 rounded-full shadow-2xl border-8 border-white hover:bg-purple-700 active:scale-95 animate-bounce z-40"
+                                                    initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }}
+                                                >
+                                                    🎨 나도 만들어볼래요!
+                                                </motion.button>
+                                            )}
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {/* STEP 6: Artwork Name Record (이전 STEP 5) */}
+                                {step === 6 && (
+                                    <motion.div key="step6" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-blue-50 to-indigo-50 overflow-y-auto hide-scrollbar"
+                                        initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.05 }}>
+
+                                        <div className="bg-white p-6 rounded-[3rem] shadow-2xl w-full max-w-[1700px] flex flex-col border-8 border-indigo-300">
+
+                                            <div className="text-center mb-4 shrink-0">
+                                                <h2 className="text-5xl font-black text-indigo-800 mb-3">💡 멋진 아이디어 구상하기!</h2>
+                                                <p className="text-3xl font-bold text-slate-700 bg-indigo-50 px-6 py-3 rounded-full inline-block">분리수거한 용품들로 나만의 작품을 만들어볼까요?</p>
+                                            </div>
+
+                                            <div className="flex flex-1 gap-6 overflow-hidden min-h-0">
+                                                <div className="flex-[0.8] bg-slate-50 border-4 border-slate-200 rounded-3xl p-5 flex flex-col gap-4 shadow-inner">
+                                                    <h3 className="text-3xl font-bold text-slate-800 text-center">✨ 예시 작품</h3>
+                                                    <div className="flex flex-col gap-3 items-center overflow-y-auto hide-scrollbar">
+                                                        <div className="flex w-full items-center bg-white p-3 rounded-2xl border-4 border-slate-200 shadow-sm gap-4">
+                                                            <div className="w-24 h-24 bg-gradient-to-br from-yellow-200 to-orange-200 rounded-xl flex items-center justify-center text-5xl">🔑</div>
+                                                            <span className="text-2xl font-bold text-slate-700">병뚜껑 키링</span>
+                                                        </div>
+                                                        <div className="flex w-full items-center bg-white p-3 rounded-2xl border-4 border-slate-200 shadow-sm gap-4">
+                                                            <div className="w-24 h-24 bg-gradient-to-br from-blue-200 to-purple-200 rounded-xl flex items-center justify-center text-5xl">🤖</div>
+                                                            <span className="text-2xl font-bold text-slate-700">폐품 로봇</span>
+                                                        </div>
+                                                        <div className="flex w-full items-center bg-white p-3 rounded-2xl border-4 border-slate-200 shadow-sm gap-4">
+                                                            <div className="w-24 h-24 bg-gradient-to-br from-amber-200 to-red-200 rounded-xl flex items-center justify-center text-5xl">🚚</div>
+                                                            <span className="text-2xl font-bold text-slate-700">종이상자 트럭</span>
+                                                        </div>
+                                                        <div className="flex w-full items-center bg-white p-3 rounded-2xl border-4 border-slate-200 shadow-sm gap-4">
+                                                            <div className="w-24 h-24 bg-gradient-to-br from-green-200 to-teal-200 rounded-xl flex items-center justify-center text-5xl">🪴</div>
+                                                            <span className="text-2xl font-bold text-slate-700">병으로 만든 화분</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex-1 flex flex-col justify-center items-center bg-blue-50 border-4 border-blue-200 rounded-3xl p-5 shadow-inner overflow-hidden">
+                                                    <div className="w-full">
+                                                        <RecorderComponent
+                                                            defaultText="나만의 작품 이름을 지어 말해보세요!"
+                                                            helpKey="artwork"
+                                                            showSelfRating={false}
+                                                            showSticker={false}
+                                                            exampleList={[
+                                                                "저는 페트병으로 멋진 화분을 만들 거예요!",
+                                                                "캔과 종이로 로봇을 만들 거예요!",
+                                                                "내 작품 이름은 '반짝이 키링'이에요!"
+                                                            ]}
+                                                            onComplete={(data) => {
+                                                                setArtworkNameData(data);
+                                                                handleNextStep();
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {/* STEP 7: Blueprint (이전 STEP 6) */}
+                                {step === 7 && (
+                                    <motion.div key="step7" className="absolute inset-0 bg-slate-50"
+                                        initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.05 }}>
+                                        <BlueprintComponent
+                                            onComplete={(base64) => {
+                                                setBlueprintData(base64);
+                                                handleNextStep();
+                                            }}
+                                        />
+                                    </motion.div>
+                                )}
+
+                                {/* STEP 8: 설계도 영상 재생 + 자기평가 (NEW!) */}
+                                {step === 8 && (
+                                    <motion.div key="step8" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-purple-50 to-pink-50 overflow-y-auto hide-scrollbar"
+                                        initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.05 }}>
+                                        <BlueprintReviewComponent
+                                            videoData={blueprintScreenRec}
+                                            imageData={blueprintData}
+                                            stars={blueprintSelfStars}
+                                            setStars={setBlueprintSelfStars}
+                                            onNext={handleNextStep}
+                                            speak={speak}
+                                            playEffect={playEffect}
+                                        />
+                                    </motion.div>
+                                )}
+
+                                {/* STEP 9: Real Photo (이전 STEP 7) */}
+                                {step === 9 && (
+                                    <motion.div key="step9" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-teal-50 to-emerald-50"
+                                        initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.05 }}>
+                                        <div className="bg-white p-12 rounded-[3rem] shadow-2xl w-full max-w-5xl flex flex-col items-center gap-6 border-8 border-teal-300 text-center">
+                                            <h2 className="text-5xl font-bold text-teal-800">🎉 오늘 활동 참 잘했어요!</h2>
+                                            <p className="text-3xl font-bold text-slate-700 bg-teal-50 px-8 py-4 rounded-full">실제로 만든 작품이 있다면 사진을 찍어 올려볼까요?</p>
+
+                                            <div className="w-80 h-80 bg-slate-100 rounded-3xl border-8 border-dashed border-slate-300 flex items-center justify-center overflow-hidden relative shadow-inner">
+                                                {actualArtworkData ? (
+                                                    <img src={actualArtworkData} alt="실제 작품" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <Icon name="Camera" size={120} className="text-slate-300" />
+                                                )}
+                                            </div>
+
+                                            <input type="file" accept="image/*" capture="environment" className="hidden" id="realPhotoUpload"
+                                                onChange={(e) => {
+                                                    const file = e.target.files[0];
+                                                    if (file) {
+                                                        const reader = new FileReader();
+                                                        reader.onloadend = () => setActualArtworkData(reader.result);
+                                                        reader.readAsDataURL(file);
+                                                    }
+                                                }}
+                                            />
+                                            <button onClick={() => document.getElementById('realPhotoUpload').click()}
+                                                className="w-full bg-teal-500 text-white text-3xl font-bold py-5 rounded-full shadow-lg hover:bg-teal-600 active:scale-95">
+                                                📷 사진 찍기 / 올리기
+                                            </button>
+                                            <p className="text-xl font-bold text-teal-700">💡 바로 아래 버튼을 누르면 활동을 계속할 수 있어요!</p>
+                                            <button onClick={handleNextStep}
+                                                className="w-full bg-slate-200 text-slate-600 text-2xl font-bold py-4 rounded-full hover:bg-slate-300 active:scale-95">
+                                                {actualArtworkData ? "다음으로 →" : "사진 없이 그냥 넘어가기 →"}
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {/* STEP 10: Post-record (의미 설명 추가 / 이전 STEP 8) */}
+                                {step === 10 && (
+                                    <motion.div key="step10" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-green-50 to-teal-50 overflow-y-auto hide-scrollbar"
+                                        initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }}>
+
+                                        {/* 사후 녹음 의미 설명 */}
+                                        <div className="bg-white px-8 py-5 rounded-3xl shadow-sm border-4 border-emerald-300 mb-4 text-center max-w-3xl">
+                                            <p className="text-2xl font-bold text-emerald-900 mb-2">🌟 활동 후 녹음이에요!</p>
+                                            <p className="text-xl font-bold text-emerald-700 leading-relaxed">
+                                                처음 녹음과 비교해서, 새롭게 알게 된 점을 말해주세요.<br />
+                                                <span className="text-purple-600">"이제는 분리수거 박사가 될 수 있어요!"</span> 처럼요. 🌱
+                                            </p>
+                                        </div>
+
+                                        <RecorderComponent
+                                            defaultText="오늘 활동을 통해 새롭게 알게 된 점은?"
+                                            helpKey="post"
+                                            exampleList={[
+                                                "오늘 분리수거를 잘하면 쓰레기가 다른 물건으로 변신할 수 있다는 걸 알았어요.",
+                                                "종이컵은 코팅이 있어서 일반쓰레기로 버린다는 걸 새로 알았어요.",
+                                                "앞으로는 집에서도 종이, 플라스틱, 캔을 잘 나누어 버리겠어요."
+                                            ]}
+                                            onComplete={(data) => {
+                                                setPostRecordData(data);
+                                                handleNextStep();
+                                            }}
+                                        />
+                                    </motion.div>
+                                )}
+
+                                {/* STEP 11: Evaluation & Submit (이전 STEP 9) */}
+                                {step === 11 && (
+                                    <motion.div key="step11" className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-yellow-50 to-amber-100"
+                                        initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
+
+                                        <div id="certificate-area" className="bg-white p-8 rounded-[3rem] shadow-2xl w-[95%] max-w-[1700px] h-[85%] flex flex-col border-[16px] border-double border-yellow-500 relative">
+
+                                            <div className="text-center mb-3 shrink-0">
+                                                <h2 className="text-[3.5rem] font-black text-yellow-800 tracking-widest">🏆 분리수거 박사 임명장 🏆</h2>
+                                                <p className="text-2xl font-bold text-slate-700">
+                                                    이름: <span className="text-blue-700 underline decoration-wavy decoration-blue-300">{studentName}</span> 박사
+                                                    {artworkNameData?.text && <span className="ml-6 text-slate-400">| 작품명: <span className="text-green-700 font-black">{artworkNameData.text}</span></span>}
+                                                </p>
+                                            </div>
+
+                                            <div className="flex flex-1 gap-5 overflow-hidden mb-4 min-h-0">
+
+                                                <div className="flex-[0.8] bg-slate-50 border-4 border-slate-200 rounded-3xl p-4 flex flex-col gap-3 min-h-0">
+                                                    <h3 className="text-2xl font-bold text-slate-800 text-center shrink-0">🎨 나의 작품</h3>
+                                                    <div className="flex-1 flex flex-col gap-3 overflow-hidden min-h-0">
+                                                        <div className="flex-1 relative bg-white rounded-2xl overflow-hidden border-4 border-slate-300 flex items-center justify-center min-h-0">
+                                                            {blueprintData ? (
+                                                                <img src={blueprintData} alt="설계도" className="w-full h-full object-contain" />
+                                                            ) : (
+                                                                <span className="text-xl font-bold text-slate-400">설계도 없음</span>
+                                                            )}
+                                                            <div className="absolute top-2 left-2 bg-black/60 text-white px-2 py-1 rounded-full text-base font-bold">📝 설계도</div>
+                                                        </div>
+                                                        {actualArtworkData && (
+                                                            <div className="flex-1 relative bg-white rounded-2xl overflow-hidden border-4 border-slate-300 flex items-center justify-center min-h-0">
+                                                                <img src={actualArtworkData} alt="실제 작품" className="w-full h-full object-contain" />
+                                                                <div className="absolute top-2 left-2 bg-green-600/80 text-white px-2 py-1 rounded-full text-base font-bold">📸 완성작</div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex-1 flex flex-col gap-3 min-h-0">
+                                                    <div className="bg-blue-50 border-4 border-blue-200 rounded-3xl p-4 flex-1 flex flex-col shadow-inner overflow-hidden min-h-0">
+                                                        <h3 className="text-2xl font-bold text-blue-800 mb-2 shrink-0">💡 활동 전 - 내가 아는 분리수거</h3>
+                                                        <div className="flex-1 overflow-y-auto hide-scrollbar min-h-0">
+                                                            <p className="text-xl font-bold text-slate-700 leading-relaxed">
+                                                                {preRecordData?.text || "녹음하지 않았어요."}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-emerald-50 border-4 border-emerald-200 rounded-3xl p-4 flex-1 flex flex-col shadow-inner overflow-hidden min-h-0">
+                                                        <h3 className="text-2xl font-bold text-emerald-800 mb-2 shrink-0">🌟 활동 후 - 새롭게 알게 된 점</h3>
+                                                        <div className="flex-1 overflow-y-auto hide-scrollbar min-h-0">
+                                                            <p className="text-xl font-bold text-slate-700 leading-relaxed">
+                                                                {postRecordData?.text || "녹음하지 않았어요."}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-pink-50 border-4 border-pink-200 rounded-3xl p-3 shadow-inner">
+                                                        <p className="text-xl font-bold text-pink-700">🎁 모은 스티커: {collectedStickers.map(s => s.emoji).join(' ')} ({collectedStickers.length}개)</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="bg-yellow-50 rounded-3xl p-4 flex items-center justify-between border-4 border-yellow-300 shadow-md shrink-0">
+                                                <div className="flex flex-col gap-2 max-w-[30%]">
+                                                    <span className="text-2xl font-bold text-yellow-900">🌟 오늘 활동 별점 주기</span>
+                                                    {stars > 0 && stars < 4 && (
+                                                        <span className="text-xl font-bold text-orange-600">다시 도전해봐요! 💪</span>
+                                                    )}
+                                                    {stars >= 4 && (
+                                                        <span className="text-xl font-bold text-green-600">최고의 박사! 🌟</span>
+                                                    )}
+                                                </div>
+
+                                                <div className="flex gap-3">
+                                                    {[1, 2, 3, 4, 5].map(star => (
+                                                        <button key={star} className="star-btn focus:outline-none"
+                                                            onClick={() => {
+                                                                playEffect('correct');
+                                                                setStars(star);
+                                                                if (star >= 4) triggerCelebration('big');
+                                                            }}>
+                                                            <Icon name="Star" size={60}
+                                                                className={`${stars >= star ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300 fill-gray-100'} transition-all`} />
+                                                        </button>
+                                                    ))}
+                                                </div>
+
+                                                <div className="flex gap-2 flex-wrap justify-end">
+                                                    {stars > 0 && stars < 4 && (
+                                                        <button onClick={() => window.location.reload()}
+                                                            className="px-5 py-3 rounded-full text-xl font-bold text-slate-700 bg-slate-200 hover:bg-slate-300 active:scale-95 shadow-lg">
+                                                            🔄 다시하기
+                                                        </button>
+                                                    )}
+                                                    <button onClick={downloadCertificate} disabled={stars === 0}
+                                                        className={`px-5 py-3 rounded-full text-xl font-bold text-white shadow-xl ${stars === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600 active:scale-95'}`}>
+                                                        ⬇️ 임명장 저장
+                                                    </button>
+                                                    <button onClick={saveAllData} disabled={stars === 0 || isSaving}
+                                                        className={`px-5 py-3 rounded-full text-xl font-bold text-white shadow-xl ${stars === 0 || isSaving ? 'bg-gray-300 cursor-not-allowed' : 'bg-orange-500 hover:bg-orange-600 active:scale-95'}`}>
+                                                        {isSaving ? '제출 중...' : '📤 제출하기'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </main>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+
+</html>
